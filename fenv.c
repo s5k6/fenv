@@ -35,6 +35,18 @@ extern char **environ;
 
 
 
+void chkUnusedOpt(char *unused, char c) {
+    if (*unused) {
+        if (c)
+            errx(1, "No pattern following `-%c` before `-%c`", *unused, c);
+        else
+            errx(1, "No pattern following `-%c` towards the end", *unused);
+    }
+    *unused = c;
+}
+
+
+
 int main(int argc, char **argv) {
 
     if (argc < 2) {
@@ -53,11 +65,12 @@ int main(int argc, char **argv) {
     if (!filters)
         err(1, "malloc");
 
-    int kindGiven = -1;
+    enum bool kindGiven = FALSE;
     enum bool curKeep = FALSE;
     enum what curWhat = NAME;
     enum algo curAlgo = GLOB;
     enum bool curFold = FALSE;
+    char unusedKeep = 0, unusedWhat = 0, unusedAlgo = 0, unusedFold = 0;
     int fc = 0;
     long int verbosity = 0;
     char **cmd = NULL;
@@ -66,15 +79,42 @@ int main(int argc, char **argv) {
         if (argv[i][0] == '-' && argv[i][1] != '-') {
 
             for (char *c = argv[i] + 1; *c; c++) {
+
+                switch (*c) {
+
+                    case 'k':
+                    case 'd':
+                        chkUnusedOpt(&unusedKeep, *c);
+                        break;
+
+                    case 'n':
+                    case 'v':
+                    case 'w':
+                        chkUnusedOpt(&unusedWhat, *c);
+                        break;
+
+                    case 'F':
+                    case 'G':
+                    case 'B':
+                    case 'E':
+                        chkUnusedOpt(&unusedAlgo, *c);
+                        break;
+
+                    case 'i':
+                    case 'I':
+                        chkUnusedOpt(&unusedFold, *c);
+                        break;
+                }
+
                 switch (*c) {
 
                     case 'k':
                         curKeep = TRUE;
-                        kindGiven = i;
+                        kindGiven = TRUE;
                         break;
                     case 'd':
                         curKeep = FALSE;
-                        kindGiven = i;
+                        kindGiven = TRUE;
                         break;
 
                     case 'n': curWhat = NAME; break;
@@ -101,7 +141,6 @@ int main(int argc, char **argv) {
 
                             if (verbosity > 15)
                                 errx(1, "Verbosity too big.");
-
                         }
                         break;
 
@@ -111,6 +150,7 @@ int main(int argc, char **argv) {
             }
 
         } else if (strcmp(argv[i], "--") == 0) {
+
             if (i >= argc - 1)
                 errx(1, "No command given after `--`.");
             cmd = argv + i + 1;
@@ -118,11 +158,14 @@ int main(int argc, char **argv) {
 
         } else {
 
-            if (kindGiven < 0)
+            if (!kindGiven)
                 errx(1, "Keep (`-k`) or drop (`-d`) must be given "
-                        "before first pattern.");
+                        "before the first pattern.");
 
-            kindGiven = 0;  // used to complain if kind is not used
+            unusedKeep = 0;
+            unusedWhat = 0;
+            unusedAlgo = 0;
+            unusedFold = 0;
 
             char *p = argv[i];
             if (strncmp(p, "--", 2) ==0)
@@ -170,8 +213,10 @@ int main(int argc, char **argv) {
     }
     endOfOptions:
 
-    if (kindGiven > 0)
-        errx(1, "Keep (`-k`) or drop (`-d`) must be followed by a pattern.");
+    chkUnusedOpt(&unusedKeep, 0);
+    chkUnusedOpt(&unusedWhat, 0);
+    chkUnusedOpt(&unusedAlgo, 0);
+    chkUnusedOpt(&unusedFold, 0);
 
     if (!cmd)
         warnx("No command given.");
