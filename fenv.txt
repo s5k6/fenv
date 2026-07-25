@@ -6,47 +6,24 @@ Run command with modified environment.
 The first form prints this help.  The second form replaces itself with
 COMMAND... after filtering the environment variables.
 
-
-Options
--------
+Patterns.  Each entry from the surrounding environment is matched
+against the patterns in the order given on the command line.  For each
+entry, only the first matching pattern decides its fate (keep or
+drop).
 
   PATTERN
-        Each environment variable is matched against the patterns in
-        the order given on the command line.  The first matching
-        pattern decides the fate (keep or drop) of the environment
-        variable.  I.e., the remaining patterns are not tested, and the
-        next environment variable is processed, again beginning with
-        the first pattern.
-
-        Whether a successful match removes the environment variable, or
-        adds it to the target environment, depends on the last
-        preceding `-k` or `-d` option, one of which must be given
-        before the first pattern.
-
-        Whether the pattern is matched against the environment
-        variable's name, its value, or the whole NAME=VALUE string,
-        depends on the last preceding `-n` (default), `-v`, or `-w`
-        option.
-
   --PATTERN
-        This is the pattern `-PATTERN`, the double dash is used to
-        discern the word from one of the options starting with a dash.
+        Words not starting with a dash `-` are considered patterns.
+        If the first character of a pattern is desired to be a dash,
+        then the leading dash must be doubled
 
-        Example: Drop all variables whose value starts with a dash:
-
-            $ fenv -dv '--*'
+Effect of a match.  Whether a successful match removes or keeps an
+entry in the target environment, depends on the last preceding `-k` or
+`-d` option, one of which must be given before the first pattern.
 
   -d    The following patterns are drop-patterns, i.e., matching
         environment variables are dropped, and will not be part of the
         new environment.
-
-        If the last pattern is a drop-pattern, then environment
-        variables not matched by any pattern are kept.
-
-        Example: Remove all environment variables whose name starts
-        with `GTK_`:
-
-            $ fenv -d 'GTK_*'
 
   -k    The following patterns are keep-patterns, i.e., matching
         environment variables are kept in the new environment.
@@ -54,64 +31,106 @@ Options
         If the last pattern is a keep-pattern, then environment
         variables not matched by any pattern are dropped.
 
-        Example: Keep only the environment variables named `HOME` and
-        `USER`:
+Unmatched entries.  If the last pattern is a drop-pattern, then
+unmatched entries are kept in the taget environment.  Conversely, if
+the last pattern is keep-pattern, unmatched entries are dropped.
 
-            $ fenv -k HOME USER
-
-        Example: Delete all environment variables whose name starts
-        with `MC_`, except for `MC_XDG_OPEN`.
-
-            $ fenv -k MC_XDG_OPEN -d 'MC_*'
+What to match.  A pattern can be appied to the NAME, the VALUE, or the
+entire NAME=VALUE string of an entry in the enviroment table.  These
+options only affect the patterns that follow on the command line.
 
   -n    The following patterns are matched against the name of an
         environment variable.  This is the default, but may be useful
         following `-v` or `-w`.
 
-  -v    The following patterns are matched against the value of an
-        environment variable.
+#  -v    The following patterns are matched against the value of an
+#        environment variable.
+#
+#  -w    The following patterns are matched against the whole NAME=VALUE
+#        string representing an environment variable and its value.
+#        This by convention should contain a `=` character.
 
-        Example: Drop all environment variables whose value contains
-        the user's name:
+Pattern Syntax.  These options only affect the patterns that follow on
+the command line.
 
-            -dv "*${USER}*"
-
-        Example: Drop all variables with an empty value
-
-            -dv ''
-
-  -w    The following patterns are matched against the whole NAME=VALUE
-        string representing an environment variable and its value.
-        This by convention should contain a `=` character.
-
-         Example: Drop the PATH variable if it contains the word `foo`:
-
-            $ fenv -dw "PATH=*foo*"
-
-Pattern Syntax
-
-  -E    Interpret  PATTERNS  as extended regular expressions (EREs, see be‐
-        low).
-
-  -F    Interpret PATTERNS as fixed strings, not regular expressions.
-
-  -G    Interpret PATTERNS as basic regular expressions (BREs, see  below).
+  -F    Interpret patterns as fixed strings, not regular expressions.
         This is the default.
 
-  -P    Interpret  PATTERNS as Perl-compatible regular expressions (PCREs).
+#  -G    Interpret patterns as globs as known from the shell.
+#
+#  -B    Interpret patterns as basic regular expressions.
+#
+#  -E    Interpret patterns as extended regular expressions.
+#
+#  -P    Interpret patterns as Perl-compatible regular expressions.
 
-  -S    Interpret the following patterns as simple globs.
-
-
-Command
+The command (and its arguments) to be executed in the modified
+environment, must be given last on the command line, following the
+ubiquitous end-of-options indicator `--`.  If no command is given,
+print a report for each environment variable, indicating whether it
+was matched, and whether it would be kept.
 
   --    End of options.  The following arguments specify the command to
         run, and its arguments.
 
-        Example: Compare the original and the modified environment:
+Debugging.  Various debug information can be printed to stderr.
 
-            $ diff <(env) <(fenv -d 'GTK_*' -- env)
+  -Vn   If n is a decimal integer, then verbosity is set to n,
+        otherwise verbosity is increased by one.  Verbosity is
+        interpreted as a bitmask, with the following values:
 
-        If no command is given, print a report for each environment
-        variable, indicating whether it was matched, and whether it
-        would be kept.
+        1   enumerate the filters constructed from the command line
+        2   report filter and environment entry on match
+        4   report unmatched environment entries
+        8   report verdict for each environment entry
+
+
+Examples.  All the following examples run the command `env`, which
+prints its environment.
+
+ 1. Drop all entries whose name starts with `GTK_` or `MC_`.  Using
+   two glob patterns:
+
+        $ fenv   -G -d 'GTK_*' 'MC_*'     -- env
+
+    Using one extended regular expression:
+
+        $ fenv   -E -d '(GTK|MC)_.*'      -- env
+
+    Using one of each:
+
+        $ fenv   -d -G 'GTK_*' -E 'MC_.*'   -- env
+
+ 2. Keep only the entries named `HOME` and `USER`:
+
+        $ fenv   -k HOME USER   -- env
+
+ 3. Drop all entries whose name starts with `MC_`, except for
+    `MC_XDG_OPEN`.  In the first version, the keep-pattern is
+    interpreted as fixed string, in the second as glob:
+
+        $ fenv      -k MC_XDG_OPEN -d -G 'MC_*'   -- env
+        $ fenv   -G -k MC_XDG_OPEN -d    'MC_*'   -- env
+
+    Same as the first one above, but the drop pattern is an extended
+    regular expression, and the option flags are arranged differently.
+
+        $ fenv      -k MC_XDG_OPEN -Ed 'MC_.*'   -- env
+
+ 4. Drop all variables with an empty *value*:
+
+        $ fenv   -dv ''   -- env
+
+    Drop all entries whose value contains the user's name.  Uses
+    globbing for the pattern
+
+        $ fenv   -Gdv "*${USER}*"   -- env
+
+ 5. Drop the PATH variable if it contains the word `foo`.
+
+        $ fenv   -dwG "PATH=*foo*"   -- env
+
+ 6. This may look a tad contrived — keep only entries whose name
+    contains an `X`, except for those whose value is a number:
+
+        $ fenv   -dvE '[0-9]*[02468]' -knG '*X*'   -- env
