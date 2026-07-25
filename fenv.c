@@ -6,12 +6,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <fnmatch.h>
+#include <regex.h>
 
 
 
 enum bool { FALSE = 0, TRUE = 1 };
 enum what { NAME, VALUE, WHOLE };
-enum algo { FIXED, GLOB /* EXTENDED BASIC PERL */ };
+enum algo { FIXED, GLOB, BASIC, EXTENDED };
 enum verb {
     VPATTERN = 1,
     VMATCH = 2,
@@ -24,7 +25,9 @@ struct filter {
     enum bool keep;
     enum what what;
     enum algo algo;
-    char *pattern;    // depending on algo, this may better be a union
+    enum bool fold;
+    char *pattern;
+    regex_t *regex;
 };
 
 
@@ -47,12 +50,14 @@ int main(int argc, char **argv) {
     // iterate over command line, collect filters
 
     struct filter *filters = calloc((size_t)argc, sizeof(struct filter));
-    if (!filters) err(1, "malloc");
+    if (!filters)
+        err(1, "malloc");
 
     int kindGiven = -1;
-    enum bool lastKeep = FALSE;
-    enum what lastWhat = NAME;
-    enum algo lastAlgo = FIXED;
+    enum bool curKeep = FALSE;
+    enum what curWhat = NAME;
+    enum algo curAlgo = GLOB;
+    enum bool curFold = FALSE;
     int fc = 0;
     long int verbosity = 0;
     char **cmd = NULL;
@@ -64,25 +69,25 @@ int main(int argc, char **argv) {
                 switch (*c) {
 
                     case 'k':
-                        lastKeep = TRUE;
+                        curKeep = TRUE;
                         kindGiven = i;
                         break;
                     case 'd':
-                        lastKeep = FALSE;
+                        curKeep = FALSE;
                         kindGiven = i;
                         break;
 
-                    case 'n': lastWhat = NAME; break;
-                    case 'v': lastWhat = VALUE; break;
-                    case 'w': lastWhat = WHOLE; break;
+                    case 'n': curWhat = NAME; break;
+                    case 'v': curWhat = VALUE; break;
+                    case 'w': curWhat = WHOLE; break;
 
-                    case 'F': lastAlgo = FIXED; break;
-                    case 'G': lastAlgo = GLOB; break;
-                    case 'B':
-                    case 'E':
-                    case 'P':
-                        errx(1, "Syntax -%c not implemented.", *c);
-                        break;
+                    case 'F': curAlgo = FIXED; break;
+                    case 'G': curAlgo = GLOB; break;
+                    case 'B': curAlgo = BASIC; break;
+                    case 'E': curAlgo = EXTENDED; break;
+
+                    case 'i': curFold = TRUE; break;
+                    case 'I': curFold = FALSE; break;
 
                     case 'V':
                         {
@@ -120,11 +125,45 @@ int main(int argc, char **argv) {
             kindGiven = 0;  // used to complain if kind is not used
 
             char *p = argv[i];
-            if (strncmp(p, "--", 2) ==0) p+=1;
-            filters[fc].keep = lastKeep;
-            filters[fc].what = lastWhat;
-            filters[fc].algo = lastAlgo;
+            if (strncmp(p, "--", 2) ==0)
+                p+=1;
+            filters[fc].keep = curKeep;
+            filters[fc].what = curWhat;
+            filters[fc].algo = curAlgo;
+            filters[fc].fold = curFold;
             filters[fc].pattern = p;
+
+            switch (curAlgo) {
+
+                case FIXED:
+                case GLOB:
+                    filters[fc].regex = NULL;
+                    break;
+
+                case BASIC:
+                case EXTENDED:
+                    {
+                        // Cf. [1] for documentation.
+#define RE (filters[fc].regex)
+                        RE = malloc(sizeof(regex_t));
+                        if (!RE)
+                            err(1, "malloc");
+                        int ec = regcomp(
+                            RE, p,
+                            REG_NOSUB | (curFold ? REG_ICASE : 0) |
+                                (curAlgo == EXTENDED ? REG_EXTENDED : 0)
+                        );
+                        if (ec) {
+                            size_t l = regerror(ec, RE, NULL, 0);
+                            char *b = malloc(l);
+                            regerror(ec, RE, b, l);
+                            if (!b)
+                                err(1, "malloc");
+                            errx(1, "regex '%s': %s", p, b);
+#undef RE
+                        }
+                    }
+            }
 
             fc++;
         }
@@ -156,15 +195,23 @@ int main(int argc, char **argv) {
             switch (filters[i].algo) {
                 case FIXED: a = "fixed"; break;
                 case GLOB: a = "glob"; break;
+                case BASIC: a = "basic"; break;
+                case EXTENDED: a = "extended"; break;
             }
-            warnx("Pattern %d: %s %s %s: %s", i, k, w, a, filters[i].pattern);
+            warnx(
+                "Pattern %d: %s %s %s %s: %s",
+                i, k, w, a,
+                filters[i].fold ? "fold" : "case",
+                filters[i].pattern
+            );
         }
     }
 
 
     // determine length of original environment
 
-    if (!*environ) errx(1, "Environment is NULL");
+    if (!*environ)
+        errx(1, "Environment is NULL");
     int oc = 0;
     while (environ[oc]) oc++;
 
@@ -172,7 +219,8 @@ int main(int argc, char **argv) {
     // iterate over old environment, produce new environment
 
     char **newenv = calloc((size_t)oc, sizeof(char *));
-    if (!newenv) err(1, "malloc");
+    if (!newenv)
+        err(1, "malloc");
     int nc = 0;
 
     char *buf = NULL;
@@ -195,10 +243,11 @@ int main(int argc, char **argv) {
                 err(1, "malloc");
         }
         strncpy(buf, environ[i], nameLen);
+        buf[nameLen] = '\0';
 
-        /* `lastKeep` is what was used for the last pattern.  The opposite
+        /* `curKeep` is what was used for the last pattern.  The opposite
         is used for unmatched environment variables. */
-        enum bool keep = !lastKeep;
+        enum bool keep = !curKeep;
 
         for (int j = 0; j < fc; j++) {
             enum bool matched = FALSE;
@@ -213,25 +262,59 @@ int main(int argc, char **argv) {
             switch (filters[j].algo) {
 
                 case FIXED:
-                    if (strcmp(filters[j].pattern, what) == 0) {
-                        matched = TRUE;
-                    }
+                    matched = strcmp(filters[j].pattern, what) == 0;
                     break;
 
                 case GLOB:
-                    if (fnmatch(filters[j].pattern, what, 0) == 0) {
-                        matched = TRUE;
+                    {
+                        int ec = fnmatch(
+                                      filters[j].pattern,
+                                      what,
+                                      filters[j].fold ? FNM_CASEFOLD : 0
+                                  );
+                        switch (ec) {
+                            case 0:
+                                matched = TRUE;
+                                break;
+                            case FNM_NOMATCH:
+                                matched = FALSE;
+                                break;
+                            default:
+                                errx(1, "fnmatch error");
+                        }
                     }
                     break;
 
+                case BASIC:
+                case EXTENDED:
+                    {
+                        int ec = regexec(filters[j].regex, what, 0, NULL, 0);
+                        switch (ec) {
+                            case 0:
+                                matched = TRUE;
+                                break;
+                            case REG_NOMATCH:
+                                matched = FALSE;
+                                break;
+                            case REG_ESPACE:
+                                errx(1, "regexec ran out of memory");
+                                break;
+                            default:
+                                errx(1, "regexec unknown error %d", ec);
+                        }
+                    }
+                    break;
             }
+
             if (matched) {
-                if (verbosity & VMATCH) warnx("Match %d: %s", j, environ[i]);
+                if (verbosity & VMATCH)
+                    warnx("Match %d: %s", j, environ[i]);
                 keep = filters[j].keep;
                 goto matched;
             }
         }
-        if (verbosity & VUNMATCHED) warnx("Unmatched: %s", environ[i]);
+        if (verbosity & VUNMATCHED)
+            warnx("Unmatched: %s", environ[i]);
         matched:
 
         if (keep)
@@ -252,3 +335,8 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+
+
+/* Notes:
+[1]: https://ftp.gnu.org/old-gnu/Manuals/glibc-2.2.5/html_node/Regular-Expressions.html#Regular%20Expressions
+*/

@@ -54,16 +54,32 @@ Pattern Syntax.  These options only affect the patterns that follow on
 the command line.
 
   -F    Interpret patterns as fixed strings, not regular expressions.
+
+        The pattern must match the entire string.  Use globs or
+        regular expressions to test for substrings.
+
+  -G    Interpret patterns as globs, cf. glob(7) for details.
         This is the default.
 
-  -G    Interpret patterns as globs as known from the shell.
+        The pattern must match the entire string.  Use `*PATTERN*` to
+        look for substrings.
 
-# not implemented
-#  -B    Interpret patterns as basic regular expressions.
-#
-#  -E    Interpret patterns as extended regular expressions.
-#
-#  -P    Interpret patterns as Perl-compatible regular expressions.
+  -B    Interpret patterns as basic regular expressions.
+
+        The pattern matches on substrings.  Use anchoring to constrain
+        matches to the beginning or end of a string.
+
+  -E    Interpret patterns as extended regular expressions.
+
+        The pattern matches on substrings.  Use anchoring to constrain
+        matches to the beginning or end of a string.
+
+Case folding.  This does not apply to fixed strings (`-F`), which are
+always case sensitive.
+
+  -i    Ignore case in the following glob, basic or extended patterns.
+
+  -I    Respect case in the following glob, basic or extended patterns.
 
 The command (and its arguments) to be executed in the modified
 environment, must be given last on the command line, following the
