@@ -7,10 +7,9 @@
 #include <stdlib.h>
 #include <fnmatch.h>
 #include <regex.h>
+#include <stdbool.h>
 
 
-
-enum bool { FALSE = 0, TRUE = 1 };
 enum what { NAME, VALUE, WHOLE };
 enum algo { FIXED, GLOB, BASIC, EXTENDED };
 enum verb {
@@ -22,10 +21,10 @@ enum verb {
 };
 
 struct filter {
-    enum bool keep;
+    bool keep;
     enum what what;
     enum algo algo;
-    enum bool fold;
+    bool fold;
     char *pattern;
     regex_t *regex;
 };
@@ -65,11 +64,11 @@ int main(int argc, char **argv) {
     if (!filters)
         err(1, "malloc");
 
-    enum bool kindGiven = FALSE;
-    enum bool curKeep = FALSE;
+    bool kindGiven = false;
+    bool curKeep = false;
     enum what curWhat = NAME;
     enum algo curAlgo = GLOB;
-    enum bool curFold = FALSE;
+    bool curFold = false;
     char unusedKeep = 0, unusedWhat = 0, unusedAlgo = 0, unusedFold = 0;
     int fc = 0;
     long int verbosity = 0;
@@ -109,12 +108,12 @@ int main(int argc, char **argv) {
                 switch (*c) {
 
                     case 'k':
-                        curKeep = TRUE;
-                        kindGiven = TRUE;
+                        curKeep = true;
+                        kindGiven = true;
                         break;
                     case 'd':
-                        curKeep = FALSE;
-                        kindGiven = TRUE;
+                        curKeep = false;
+                        kindGiven = true;
                         break;
 
                     case 'n': curWhat = NAME; break;
@@ -126,8 +125,8 @@ int main(int argc, char **argv) {
                     case 'B': curAlgo = BASIC; break;
                     case 'E': curAlgo = EXTENDED; break;
 
-                    case 'i': curFold = TRUE; break;
-                    case 'I': curFold = FALSE; break;
+                    case 'i': curFold = true; break;
+                    case 'I': curFold = false; break;
 
                     case 'V':
                         {
@@ -292,10 +291,10 @@ int main(int argc, char **argv) {
 
         /* `curKeep` is what was used for the last pattern.  The opposite
         is used for unmatched environment variables. */
-        enum bool keep = !curKeep;
+        bool keep = !curKeep;
 
         for (int j = 0; j < fc; j++) {
-            enum bool matched = FALSE;
+            bool matched = false;
 
             char *what;
             switch (filters[j].what) {
@@ -319,10 +318,10 @@ int main(int argc, char **argv) {
                                   );
                         switch (ec) {
                             case 0:
-                                matched = TRUE;
+                                matched = true;
                                 break;
                             case FNM_NOMATCH:
-                                matched = FALSE;
+                                matched = false;
                                 break;
                             default:
                                 errx(1, "fnmatch error");
@@ -336,10 +335,10 @@ int main(int argc, char **argv) {
                         int ec = regexec(filters[j].regex, what, 0, NULL, 0);
                         switch (ec) {
                             case 0:
-                                matched = TRUE;
+                                matched = true;
                                 break;
                             case REG_NOMATCH:
-                                matched = FALSE;
+                                matched = false;
                                 break;
                             case REG_ESPACE:
                                 errx(1, "regexec ran out of memory");
