@@ -5,10 +5,13 @@
 #include <err.h>
 #include <string.h>
 #include <stdlib.h>
+#include <fnmatch.h>
+
+
 
 enum bool { FALSE = 0, TRUE = 1 };
 enum what { NAME, VALUE, WHOLE };
-enum algo { FIXED /* EXTENDED BASIC PERL GLOB */ };
+enum algo { FIXED, GLOB /* EXTENDED BASIC PERL */ };
 enum verb {
     VPATTERN = 1,
     VMATCH = 2,
@@ -26,6 +29,7 @@ struct filter {
 
 
 extern char **environ;
+
 
 
 int main(int argc, char **argv) {
@@ -46,9 +50,9 @@ int main(int argc, char **argv) {
     if (!filters) err(1, "malloc");
 
     int kindGiven = -1;
-    enum bool keep = FALSE;
-    enum what what = NAME;
-    enum algo algo = FIXED;
+    enum bool lastKeep = FALSE;
+    enum what lastWhat = NAME;
+    enum algo lastAlgo = FIXED;
     int fc = 0;
     long int verbosity = 0;
     char **cmd = NULL;
@@ -60,33 +64,23 @@ int main(int argc, char **argv) {
                 switch (*c) {
 
                     case 'k':
-                        keep = TRUE;
+                        lastKeep = TRUE;
                         kindGiven = i;
                         break;
                     case 'd':
-                        keep = FALSE;
+                        lastKeep = FALSE;
                         kindGiven = i;
                         break;
 
-                    case 'n':
-                        what = NAME;
-                        break;
-                    case 'v':
-                        errx(1, "Matching values not implemented.");
-                        what = VALUE;
-                        break;
-                    case 'w':
-                        errx(1, "Matching whole entries not implemented.");
-                        what = WHOLE;
-                        break;
+                    case 'n': lastWhat = NAME; break;
+                    case 'v': lastWhat = VALUE; break;
+                    case 'w': lastWhat = WHOLE; break;
 
-                    case 'F':
-                        algo = FIXED;
-                        break;
-                    case 'E':
+                    case 'F': lastAlgo = FIXED; break;
+                    case 'G': lastAlgo = GLOB; break;
                     case 'B':
+                    case 'E':
                     case 'P':
-                    case 'G':
                         errx(1, "Syntax -%c not implemented.", *c);
                         break;
 
@@ -127,9 +121,9 @@ int main(int argc, char **argv) {
 
             char *p = argv[i];
             if (strncmp(p, "--", 2) ==0) p+=1;
-            filters[fc].keep = keep;
-            filters[fc].what = what;
-            filters[fc].algo = algo;
+            filters[fc].keep = lastKeep;
+            filters[fc].what = lastWhat;
+            filters[fc].algo = lastAlgo;
             filters[fc].pattern = p;
 
             fc++;
@@ -140,13 +134,11 @@ int main(int argc, char **argv) {
     if (kindGiven > 0)
         errx(1, "Keep (`-k`) or drop (`-d`) must be followed by a pattern.");
 
+    if (!cmd)
+        warnx("No command given.");
+
     if (verbosity > 0)
         warnx("Verbosity is %ld.", verbosity);
-
-    if (!cmd) {
-        warnx("No command given, will print filters.");
-        verbosity = 1;
-    }
 
     // print accumulated filters
 
@@ -162,7 +154,8 @@ int main(int argc, char **argv) {
                 case WHOLE: w = "whole"; break;
             }
             switch (filters[i].algo) {
-                case FIXED: a = "fix"; break;
+                case FIXED: a = "fixed"; break;
+                case GLOB: a = "glob"; break;
             }
             warnx("Pattern %d: %s %s %s: %s", i, k, w, a, filters[i].pattern);
         }
@@ -182,26 +175,51 @@ int main(int argc, char **argv) {
     if (!newenv) err(1, "malloc");
     int nc = 0;
 
+    char *buf = NULL;
+    size_t bufLen = 0;
+
     for (int i = 0; environ[i]; i++) {
 
-        // find length of name and pointer to value
+        // find value, copy name (so we have it as separate string)
         char *val = strchr(environ[i], '=');
         if (!val) {
-            warnx("Pathological entry: %s", environ[i]);
+            warnx("Dropping pathological entry: %s", environ[i]);
             continue;
         }
         size_t nameLen = (size_t)(val - environ[i]);
+        val++; // was previously pointing to the `=`
+        if (bufLen <= nameLen) {
+            bufLen = 2 * (nameLen + 1);
+            buf = realloc(buf, bufLen);
+            if (!buf)
+                err(1, "malloc");
+        }
+        strncpy(buf, environ[i], nameLen);
 
-        /* `keep` is what was used for the last pattern.  The opposite
+        /* `lastKeep` is what was used for the last pattern.  The opposite
         is used for unmatched environment variables. */
-        enum bool verdict = !keep;
+        enum bool keep = !lastKeep;
 
         for (int j = 0; j < fc; j++) {
             enum bool matched = FALSE;
+
+            char *what;
+            switch (filters[j].what) {
+                case NAME: what = buf; break;
+                case VALUE: what = val; break;
+                case WHOLE: what = environ[i]; break;
+            }
+
             switch (filters[j].algo) {
 
                 case FIXED:
-                    if (strncmp(filters[j].pattern, environ[i], nameLen) == 0) {
+                    if (strcmp(filters[j].pattern, what) == 0) {
+                        matched = TRUE;
+                    }
+                    break;
+
+                case GLOB:
+                    if (fnmatch(filters[j].pattern, what, 0) == 0) {
                         matched = TRUE;
                     }
                     break;
@@ -209,19 +227,18 @@ int main(int argc, char **argv) {
             }
             if (matched) {
                 if (verbosity & VMATCH) warnx("Match %d: %s", j, environ[i]);
-                verdict = filters[j].keep;
+                keep = filters[j].keep;
                 goto matched;
             }
         }
         if (verbosity & VUNMATCHED) warnx("Unmatched: %s", environ[i]);
-
         matched:
 
-        if (verdict)
+        if (keep)
             newenv[nc++] = environ[i];
 
         if (verbosity & VVERDICT)
-            warnx("%s: %s", verdict ? "Keep" : "Drop", environ[i]);
+            warnx("%s: %s", keep ? "Keep" : "Drop", environ[i]);
     }
     newenv[nc] = NULL;
 

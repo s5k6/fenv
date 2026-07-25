@@ -1,5 +1,6 @@
 vpcc = gcc -std=c99 -g -Wall -Wextra -Wpedantic -Wbad-function-cast \
-        -Wconversion -Wwrite-strings -Wstrict-prototypes -Wshadow
+        -Wconversion -Wwrite-strings -Wstrict-prototypes -Wshadow \
+	-Wno-overlength-strings
 
 .PHONY : all test clean distclean
 
