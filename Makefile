@@ -7,13 +7,10 @@ vpcc = gcc -std=c99 -g -Wall -Wextra -Wpedantic -Wbad-function-cast \
 all : fenv
 
 clean :
-	rm -rf fenv.help testcases/
+	rm -rf *.str
 
 distclean : clean
 	rm -f fenv
-
-test : fenv
-	./testsuite
 
 fenv : fenv.c help.str
 

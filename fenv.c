@@ -54,10 +54,10 @@ presence pointless. */
 void chkUnusedOpt(char *unused, char c) {
     if (*unused) {
         if (c)
-            warnx("Option -%c undoes option -%c, which is not used by "
-                  "any pattern.", c, *unused);
+            errx(1, "Option -%c undoes option -%c, which is not used by "
+                    "any pattern.", c, *unused);
         else
-            warnx("Option -%c is not used by any pattern.", *unused);
+            errx(1, "Option -%c is not used by any pattern.", *unused);
     }
     *unused = c;
 }
@@ -177,9 +177,12 @@ int main(int argc, char **argv) {
     enum what curWhat = NAME;
     enum algo curAlgo = GLOB;
 
-    /* Keep track of what options have been given, and whether they
-    were used. */
-    bool keepGiven = false;
+
+    /* For each of the four categories of filter modifying options,
+    keep track of what options have been given, and whether they were
+    used.  A null character indicates that no option was used since
+    the last pattern. */
+
     char unusedKeep = '\0', unusedFold = '\0', unusedWhat = '\0',
         unusedAlgo = '\0';
 
@@ -224,14 +227,8 @@ int main(int argc, char **argv) {
                 /* Handles all options and detects invalid ones. */
                 switch (*c) {
 
-                    case 'k':
-                        curKeep = true;
-                        keepGiven = true;
-                        break;
-                    case 'd':
-                        curKeep = false;
-                        keepGiven = true;
-                        break;
+                    case 'k': curKeep = true; break;
+                    case 'd': curKeep = false; break;
 
                     case 'n': curWhat = NAME; break;
                     case 'v': curWhat = VALUE; break;
@@ -280,13 +277,8 @@ int main(int argc, char **argv) {
 
         } else {
 
-            /* This argument is a pattern.  Verify that "keep or drop"
-            was specified before.  Then mark all modifier categories
-            as used. */
-
-            if (!keepGiven)
-                errx(1, "Keep (`-k`) or drop (`-d`) must be given "
-                        "before the first pattern.");
+            /* This argument is a pattern.  Mark all modifier
+            categories as used. */
 
             unusedKeep = '\0';
             unusedWhat = '\0';
@@ -417,8 +409,7 @@ int main(int argc, char **argv) {
         memcpy(name, environ[i], l);
         name[l] = '\0';
 
-        val++; // This was previously pointing to the `=`.
-
+        val++; // Previously pointing to the `=`, move to start of value.
 
         /* `curKeep` is what was used for the last pattern specified
         on the command line.  The opposite is used for unmatched
@@ -430,7 +421,7 @@ int main(int argc, char **argv) {
             struct filter const f = filters[j];
             bool matched = false;
 
-            /* What to apply the pattern to? */
+            /* What to apply the pattern to */
             char *what;
             switch (f.what) {
                 case NAME: what = name; break;
@@ -440,15 +431,17 @@ int main(int argc, char **argv) {
 
             /* Choose matching algorithm */
             switch (f.algo) {
+
                 case FIXED:
                     matched = matchFix(f.pattern, what, f.fold);
                     break;
+
                 case GLOB:
                     matched = matchGlob(f.pattern, what, f.fold);
                     break;
+
                 case BASIC:
                 case EXTENDED:
-                    // fold is compiled in
                     matched = matchRegex(f.regex, what);
                     break;
             }
@@ -475,7 +468,7 @@ int main(int argc, char **argv) {
     /* Terminate environment with null pointer.  Trim size */
 
     newenv[newenvTop++] = NULL;
-    newenv = realloc(newenv, newenvTop);
+    newenv = realloc(newenv, newenvTop * sizeof(char*));
     if (!newenv)
         err(1, "malloc");
 

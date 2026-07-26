@@ -17,23 +17,15 @@ drop).
         If the first character of a pattern is desired to be a dash,
         then the leading dash must be doubled
 
-Defaults: Cases-sensitive globs matched against environment variable
-name.  This is equivalent to `-IGn`.  There is no default for `-d` or
-`-k`, which must be given explicitly.
+Defaults: Drop entries with names matching a cases-sensitive glob.
+This is equivalent to `-dIGn`.
 
-Effect of a match.  Whether a successful match removes or keeps an
-entry in the target environment, depends on the last preceding `-k` or
-`-d` option, one of which must be given before the first pattern.
+Effect of a match.  Entries matching drop-patterns (the default) are
+dropped, those matching keep-patterns are kept.
 
-  -d    The following patterns are drop-patterns, i.e., matching
-        environment variables are dropped, and will not be part of the
-        new environment.
+  -d    The following patterns are drop-patterns.
 
-  -k    The following patterns are keep-patterns, i.e., matching
-        environment variables are kept in the new environment.
-
-        If the last pattern is a keep-pattern, then environment
-        variables not matched by any pattern are dropped.
+  -k    The following patterns are keep-patterns.
 
 Unmatched entries.  If the last pattern is a drop-pattern, then
 unmatched entries are kept in the taget environment.  Conversely, if
@@ -54,40 +46,36 @@ options only affect the patterns that follow on the command line.
         string representing an environment variable and its value.
         This by convention should contain a `=` character.
 
-Pattern Syntax.  These options only affect the patterns that follow on
+How to match.  These options only affect the patterns that follow on
 the command line.
 
-  -F    Interpret patterns as fixed strings, not regular expressions.
-        The pattern must match the entire string.  Use globs or
-        regular expressions to test for substrings.  Cf. strcmp(3),
-        strcasecmp(3).
+  -F    Fixed strings.  The pattern must match the entire string.  Use
+        globs or regular expressions to test for substrings.  For
+        details, cf. strcmp(3), strcasecmp(3).
 
-  -G    Interpret patterns as globs, cf. glob(7) for details.  This is
-        the default.  The pattern must match the entire string.  Use
-        `*PATTERN*` to look for substrings.  Cf. fnmatch(3).
+  -G    Globs.  This is the default.  The pattern must match the
+        entire string.  Use `*PATTERN*` to look for substrings.  For
+        details, cf. glob(7), fnmatch(3).
 
-  -B    Interpret patterns as basic regular expressions.  The pattern
-        matches on substrings.  Use anchoring to further constrain
-        matches.  Cf. regcomp(3).
+  -B    Basic regular expressions.  The pattern matches on substrings.
+        Use anchoring to further constrain matches.  For details,
+        cf. regcomp(3).
 
-  -E    Interpret patterns as extended regular expressions.  The
-        pattern matches on substrings.  Use anchoring to further
-        constrain matches.  Cf. regcomp(3) flag `REG_EXTENDED`.
+  -E    Extended regular expressions.  The pattern matches on
+        substrings.  Use anchoring to further constrain matches.
+        For details, cf. regcomp(3) flag `REG_EXTENDED`.
 
 Case sensitivity.
 
   -I    Patterns are case-sensitive.  This is the default.
 
-  -i    Ignore case when matching the following patterns.
-        Cf. strcasecmp(3), fnmatch(3) flag `FNM_CASEFOLD`, or
+  -i    Ignore case when matching the following patterns.  For
+        details, cf. strcasecmp(3), fnmatch(3) flag `FNM_CASEFOLD`, or
         regcomp(3) flag `REG_ICASE`.
 
-
 The command (and its arguments) to be executed in the modified
-environment, must be given last on the command line, following the
-ubiquitous end-of-options indicator `--`.  If no command is given,
-print a report for each environment variable, indicating whether it
-was matched, and whether it would be kept.
+environment must be given last on the command line, following the
+ubiquitous end-of-options indicator `--`.
 
   --    End of options.  The following arguments specify the command to
         run, and its arguments.
