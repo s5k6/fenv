@@ -17,6 +17,10 @@ drop).
         If the first character of a pattern is desired to be a dash,
         then the leading dash must be doubled
 
+Defaults: Cases-sensitive globs matched against environment variable
+name.  This is equivalent to `-IGn`.  There is no default for `-d` or
+`-k`, which must be given explicitly.
+
 Effect of a match.  Whether a successful match removes or keeps an
 entry in the target environment, depends on the last preceding `-k` or
 `-d` option, one of which must be given before the first pattern.
@@ -54,32 +58,30 @@ Pattern Syntax.  These options only affect the patterns that follow on
 the command line.
 
   -F    Interpret patterns as fixed strings, not regular expressions.
-
         The pattern must match the entire string.  Use globs or
-        regular expressions to test for substrings.
+        regular expressions to test for substrings.  Cf. strcmp(3),
+        strcasecmp(3).
 
-  -G    Interpret patterns as globs, cf. glob(7) for details.
-        This is the default.
+  -G    Interpret patterns as globs, cf. glob(7) for details.  This is
+        the default.  The pattern must match the entire string.  Use
+        `*PATTERN*` to look for substrings.  Cf. fnmatch(3).
 
-        The pattern must match the entire string.  Use `*PATTERN*` to
-        look for substrings.
+  -B    Interpret patterns as basic regular expressions.  The pattern
+        matches on substrings.  Use anchoring to further constrain
+        matches.  Cf. regcomp(3).
 
-  -B    Interpret patterns as basic regular expressions.
+  -E    Interpret patterns as extended regular expressions.  The
+        pattern matches on substrings.  Use anchoring to further
+        constrain matches.  Cf. regcomp(3) flag `REG_EXTENDED`.
 
-        The pattern matches on substrings.  Use anchoring to constrain
-        matches to the beginning or end of a string.
+Case sensitivity.
 
-  -E    Interpret patterns as extended regular expressions.
+  -I    Patterns are case-sensitive.  This is the default.
 
-        The pattern matches on substrings.  Use anchoring to constrain
-        matches to the beginning or end of a string.
+  -i    Ignore case when matching the following patterns.
+        Cf. strcasecmp(3), fnmatch(3) flag `FNM_CASEFOLD`, or
+        regcomp(3) flag `REG_ICASE`.
 
-Case folding.  This does not apply to fixed strings (`-F`), which are
-always case sensitive.
-
-  -i    Ignore case in the following glob, basic or extended patterns.
-
-  -I    Respect case in the following glob, basic or extended patterns.
 
 The command (and its arguments) to be executed in the modified
 environment, must be given last on the command line, following the

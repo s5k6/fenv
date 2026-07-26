@@ -10,43 +10,141 @@
 #include <stdbool.h>
 
 
+
+/* Patterns can be matched against the NAME, the VALUE, or the entire
+NAME=VALUE string representing an enviroment entry.*/
+
 enum what { NAME, VALUE, WHOLE };
+
+
+/* Patterns can be interpreted as fixed stringm glob, basic or
+extended regular expression.  Perl sucks, as a matter of principle. */
+
 enum algo { FIXED, GLOB, BASIC, EXTENDED };
-enum verb {
-    VPATTERN = 1,
-    VMATCH = 2,
-    VUNMATCHED = 4,
-    VVERDICT = 8,
-    VCMD = 16
-};
+
+
+/* A filter is a pattern, along with metadata on how to use it. */
 
 struct filter {
-    bool keep;
-    enum what what;
-    enum algo algo;
+    bool keep;       // Keep matching entries if true, drop them otherwise.
+    enum what what;  // cf. `enum what`
+    enum algo algo;  // cf. `enum algo`
     bool fold;
     char *pattern;
     regex_t *regex;
 };
 
 
-extern char **environ;
+/* Verbositu is controlled by the following bits. */
+
+enum verb {
+    VPATTERN = 1,    // print patterns
+    VMATCH = 2,      // report matching entries and pattern
+    VUNMATCHED = 4,  // report unmatched entries
+    VVERDICT = 8     // report verdict, keep or drop
+};
 
 
+
+/* Most options specify how the subsequent patterns are to be used
+(glob/regex, case sensitivity). Warn, if such an option goes unused.
+E.g., in `fenv -i -I` the `-I` cancels the prior `-i`, making its
+presence pointless. */
 
 void chkUnusedOpt(char *unused, char c) {
     if (*unused) {
         if (c)
-            errx(1, "No pattern following `-%c` before `-%c`", *unused, c);
+            warnx("Option -%c undoes option -%c, which is not used by "
+                  "any pattern.", c, *unused);
         else
-            errx(1, "No pattern following `-%c` towards the end", *unused);
+            warnx("Option -%c is not used by any pattern.", *unused);
     }
     *unused = c;
 }
 
 
 
+/* Compile regular expression.  Cf. [1] for documentation. */
+
+regex_t *regex(char const *pat, bool fold, bool ext) {
+
+    regex_t *re =malloc(sizeof(regex_t));
+    if (!re)
+        err(1, "malloc");
+
+    int flags = REG_NOSUB | (fold ? REG_ICASE : 0) | (ext ? REG_EXTENDED : 0);
+
+    int ec = regcomp(re, pat, flags);
+    if (ec) {
+        size_t len = regerror(ec, re, NULL, 0);
+        char *buf = malloc(len);
+        if (!buf)
+            err(1, "malloc");
+        regerror(ec, re, buf, len);
+        errx(1, "regex '%s': %s", pat, buf);
+    }
+
+    return re;
+}
+
+
+
+/* Match a fixed string. */
+
+bool matchFix(char const *pat, char const *str, bool fold) {
+
+    if (fold)
+        return strcasecmp(pat, str) == 0;
+
+    return strcmp(pat, str) == 0;
+}
+
+
+
+/* Match a glob. */
+
+bool matchGlob(char const *pat, char const *str, bool fold) {
+
+    int ec = fnmatch(pat, str, fold ? FNM_CASEFOLD : 0);
+
+    switch (ec) {
+        case 0:
+            return true;
+        case FNM_NOMATCH:
+            return false;
+        default:
+            errx(1, "fnmatch error %d", ec);
+    }
+}
+
+
+
+/* Match a compiled regular expression. */
+
+bool matchRegex(regex_t const *re, char const *str) {
+
+    int ec = regexec(re, str, 0, NULL, 0);
+
+    switch (ec) {
+        case 0:
+            return true;
+        case REG_NOMATCH:
+            return false;
+        case REG_ESPACE:
+            errx(1, "regexec ran out of memory");
+        default:
+            errx(1, "regexec unknown error %d", ec);
+    }
+}
+
+
+
+/* It's pretty straight forward, we do most of this in one go. */
+
 int main(int argc, char **argv) {
+
+
+    /* Print help if called without arguments. */
 
     if (argc < 2) {
         printf(
@@ -58,27 +156,45 @@ int main(int argc, char **argv) {
     }
 
 
-    // iterate over command line, collect filters
+    // Iterate over the command line arguments
+    // ---------------------------------------
+
+    /* Assume as many filters as there are command line options.
+    There cannot be more. */
 
     struct filter *filters = calloc((size_t)argc, sizeof(struct filter));
     if (!filters)
         err(1, "malloc");
+    int filterTop = 0;  // utilisation of filters
+#define FILTER (filters[filterTop])
 
-    bool kindGiven = false;
+    long int verbosity = 0;  // verbosity setting
+    char **cmd = NULL;  // command to run
+
+    /* Current setting of filter modifiers. */
     bool curKeep = false;
+    bool curFold = false;
     enum what curWhat = NAME;
     enum algo curAlgo = GLOB;
-    bool curFold = false;
-    char unusedKeep = 0, unusedWhat = 0, unusedAlgo = 0, unusedFold = 0;
-    int fc = 0;
-    long int verbosity = 0;
-    char **cmd = NULL;
+
+    /* Keep track of what options have been given, and whether they
+    were used. */
+    bool keepGiven = false;
+    char unusedKeep = '\0', unusedFold = '\0', unusedWhat = '\0',
+        unusedAlgo = '\0';
 
     for (int i = 1; i < argc; i++) {
+
         if (argv[i][0] == '-' && argv[i][1] != '-') {
+
+            /* Everything starting with `-` but not `--` is considered
+            a string of options.  Iterate over the individual
+            characters. */
 
             for (char *c = argv[i] + 1; *c; c++) {
 
+                /* Check whether an option undoes a prior option that
+                remained unused. */
                 switch (*c) {
 
                     case 'k':
@@ -105,15 +221,16 @@ int main(int argc, char **argv) {
                         break;
                 }
 
+                /* Handles all options and detects invalid ones. */
                 switch (*c) {
 
                     case 'k':
                         curKeep = true;
-                        kindGiven = true;
+                        keepGiven = true;
                         break;
                     case 'd':
                         curKeep = false;
-                        kindGiven = true;
+                        keepGiven = true;
                         break;
 
                     case 'n': curWhat = NAME; break;
@@ -128,6 +245,9 @@ int main(int argc, char **argv) {
                     case 'i': curFold = true; break;
                     case 'I': curFold = false; break;
 
+                    /* Set verbosity, either by value, or increase by
+                    one.  This is a bit ugly, as it does not match the
+                    other option parsing logic. */
                     case 'V':
                         {
                             char *q = c + 1;
@@ -150,68 +270,64 @@ int main(int argc, char **argv) {
 
         } else if (strcmp(argv[i], "--") == 0) {
 
+            /* Standalone option `--` indicates "end of options", the
+            remaining arguments constitute the command to run. */
+
             if (i >= argc - 1)
                 errx(1, "No command given after `--`.");
             cmd = argv + i + 1;
-            goto endOfOptions;
+            break;  // end of options
 
         } else {
 
-            if (!kindGiven)
+            /* This argument is a pattern.  Verify that "keep or drop"
+            was specified before.  Then mark all modifier categories
+            as used. */
+
+            if (!keepGiven)
                 errx(1, "Keep (`-k`) or drop (`-d`) must be given "
                         "before the first pattern.");
 
-            unusedKeep = 0;
-            unusedWhat = 0;
-            unusedAlgo = 0;
-            unusedFold = 0;
+            unusedKeep = '\0';
+            unusedWhat = '\0';
+            unusedAlgo = '\0';
+            unusedFold = '\0';
 
+            /* A leading dash `-` in a pattern must be escaped by
+            doubling it, i.e., command line argument `--foo`
+            represents pattern `-foo`. */
             char *p = argv[i];
             if (strncmp(p, "--", 2) ==0)
                 p+=1;
-            filters[fc].keep = curKeep;
-            filters[fc].what = curWhat;
-            filters[fc].algo = curAlgo;
-            filters[fc].fold = curFold;
-            filters[fc].pattern = p;
 
+            /* Populate filter with current settings */
+            FILTER.keep = curKeep;
+            FILTER.what = curWhat;
+            FILTER.algo = curAlgo;
+            FILTER.fold = curFold;
+            FILTER.pattern = p;
+
+            /* For basic and extended regular expressions, compile the
+            regex data structure to be used in matching. */
             switch (curAlgo) {
 
                 case FIXED:
                 case GLOB:
-                    filters[fc].regex = NULL;
+                    FILTER.regex = NULL;
                     break;
 
                 case BASIC:
                 case EXTENDED:
-                    {
-                        // Cf. [1] for documentation.
-#define RE (filters[fc].regex)
-                        RE = malloc(sizeof(regex_t));
-                        if (!RE)
-                            err(1, "malloc");
-                        int ec = regcomp(
-                            RE, p,
-                            REG_NOSUB | (curFold ? REG_ICASE : 0) |
-                                (curAlgo == EXTENDED ? REG_EXTENDED : 0)
-                        );
-                        if (ec) {
-                            size_t l = regerror(ec, RE, NULL, 0);
-                            char *b = malloc(l);
-                            regerror(ec, RE, b, l);
-                            if (!b)
-                                err(1, "malloc");
-                            errx(1, "regex '%s': %s", p, b);
-#undef RE
-                        }
-                    }
+                    FILTER.regex = regex(p, curFold, curAlgo == EXTENDED);
+                    break;
             }
 
-            fc++;
+            /* Advance the filter counter. */
+            filterTop++;
         }
     }
-    endOfOptions:
 
+    /* Check, whether an option went unused by any pattern. */
     chkUnusedOpt(&unusedKeep, 0);
     chkUnusedOpt(&unusedWhat, 0);
     chkUnusedOpt(&unusedAlgo, 0);
@@ -223,12 +339,14 @@ int main(int argc, char **argv) {
     if (verbosity > 0)
         warnx("Verbosity is %ld.", verbosity);
 
-    // print accumulated filters
 
-    if (fc < 1) {
+    // Print accumulated filters
+    // -------------------------
+
+    if (filterTop < 1) {
         warnx("No filters defined, this is pointless.");
     } else if (verbosity & VPATTERN) {
-        for (int i = 0; i < fc; i++) {
+        for (int i = 0; i < filterTop; i++) {
             char const *k, *w, *a;
             k = filters[i].keep ? "keep" : "drop";
             switch (filters[i].what) {
@@ -252,109 +370,94 @@ int main(int argc, char **argv) {
     }
 
 
-    // determine length of original environment
+    // Construct new environment
+    // -------------------------
 
-    if (!*environ)
-        errx(1, "Environment is NULL");
-    int oc = 0;
-    while (environ[oc]) oc++;
+    /* Determine length of original environment, and allocate buffer
+    for new environment.  The new environment has at most as many
+    entries as the old one. */
 
+    if (!environ)
+        errx(1, "Original environment is NULL");
+    size_t environCount = 0;
+    while (environ[environCount])
+        environCount++;
 
-    // iterate over old environment, produce new environment
-
-    char **newenv = calloc((size_t)oc, sizeof(char *));
+    char **newenv = calloc(environCount + 1, sizeof(char *));
     if (!newenv)
         err(1, "malloc");
-    int nc = 0;
+    size_t newenvTop = 0;
 
-    char *buf = NULL;
-    size_t bufLen = 0;
+
+    /* A buffer is needed to maintain a copy of an environment
+    variable's name. */
+    char *name = NULL;
+    size_t nameLen = 0;
+
+
+    /* Iterate over old environment, produce new environment */
 
     for (int i = 0; environ[i]; i++) {
 
-        // find value, copy name (so we have it as separate string)
+        // Find value, copy name (so we have it as separate string)
         char *val = strchr(environ[i], '=');
         if (!val) {
             warnx("Dropping pathological entry: %s", environ[i]);
             continue;
         }
-        size_t nameLen = (size_t)(val - environ[i]);
-        val++; // was previously pointing to the `=`
-        if (bufLen <= nameLen) {
-            bufLen = 2 * (nameLen + 1);
-            buf = realloc(buf, bufLen);
-            if (!buf)
+
+        // Determine length of name, and copy to buf, terminating with `\0`.
+        size_t l = (size_t)(val - environ[i]);
+        if (nameLen <= l) {
+            nameLen = 2 * (l + 1);
+            name = realloc(name, nameLen);
+            if (!name)
                 err(1, "malloc");
         }
-        strncpy(buf, environ[i], nameLen);
-        buf[nameLen] = '\0';
+        memcpy(name, environ[i], l);
+        name[l] = '\0';
 
-        /* `curKeep` is what was used for the last pattern.  The opposite
-        is used for unmatched environment variables. */
+        val++; // This was previously pointing to the `=`.
+
+
+        /* `curKeep` is what was used for the last pattern specified
+        on the command line.  The opposite is used for unmatched
+        environment variables, i.e., it's the default now. */
         bool keep = !curKeep;
 
-        for (int j = 0; j < fc; j++) {
+        /* Iterate over patterns, first match exits the loop. */
+        for (int j = 0; j < filterTop; j++) {
+            struct filter const f = filters[j];
             bool matched = false;
 
+            /* What to apply the pattern to? */
             char *what;
-            switch (filters[j].what) {
-                case NAME: what = buf; break;
+            switch (f.what) {
+                case NAME: what = name; break;
                 case VALUE: what = val; break;
                 case WHOLE: what = environ[i]; break;
             }
 
-            switch (filters[j].algo) {
-
+            /* Choose matching algorithm */
+            switch (f.algo) {
                 case FIXED:
-                    matched = strcmp(filters[j].pattern, what) == 0;
+                    matched = matchFix(f.pattern, what, f.fold);
                     break;
-
                 case GLOB:
-                    {
-                        int ec = fnmatch(
-                                      filters[j].pattern,
-                                      what,
-                                      filters[j].fold ? FNM_CASEFOLD : 0
-                                  );
-                        switch (ec) {
-                            case 0:
-                                matched = true;
-                                break;
-                            case FNM_NOMATCH:
-                                matched = false;
-                                break;
-                            default:
-                                errx(1, "fnmatch error");
-                        }
-                    }
+                    matched = matchGlob(f.pattern, what, f.fold);
                     break;
-
                 case BASIC:
                 case EXTENDED:
-                    {
-                        int ec = regexec(filters[j].regex, what, 0, NULL, 0);
-                        switch (ec) {
-                            case 0:
-                                matched = true;
-                                break;
-                            case REG_NOMATCH:
-                                matched = false;
-                                break;
-                            case REG_ESPACE:
-                                errx(1, "regexec ran out of memory");
-                                break;
-                            default:
-                                errx(1, "regexec unknown error %d", ec);
-                        }
-                    }
+                    // fold is compiled in
+                    matched = matchRegex(f.regex, what);
                     break;
             }
 
             if (matched) {
                 if (verbosity & VMATCH)
                     warnx("Match %d: %s", j, environ[i]);
-                keep = filters[j].keep;
-                goto matched;
+                keep = f.keep;
+                goto matched;  // break out of two nested loops
             }
         }
         if (verbosity & VUNMATCHED)
@@ -362,15 +465,23 @@ int main(int argc, char **argv) {
         matched:
 
         if (keep)
-            newenv[nc++] = environ[i];
+            newenv[newenvTop++] = environ[i];
 
         if (verbosity & VVERDICT)
             warnx("%s: %s", keep ? "Keep" : "Drop", environ[i]);
     }
-    newenv[nc] = NULL;
 
 
-    // run the command
+    /* Terminate environment with null pointer.  Trim size */
+
+    newenv[newenvTop++] = NULL;
+    newenv = realloc(newenv, newenvTop);
+    if (!newenv)
+        err(1, "malloc");
+
+
+    // Run the command
+    // ---------------
 
     if (cmd) {
         execvpe(cmd[0], cmd, newenv);
