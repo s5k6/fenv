@@ -1,0 +1,19 @@
+#!/bin/bash
+set -u -e -C;
+shopt -s nullglob failglob
+
+# run diff ignoring its exit code.
+function diff { command diff "$@" || true; }
+
+
+# Load environment from file (twice).  Compare printing the
+# environment without fenv, and with fenv.
+
+# Drop all entries whose name starts with `MC_`, except for
+# `MC_XDG_OPEN`.
+
+diff \
+    <(env -i -S "$(< "${repo}/tests/env")" ) \
+    <(env -i -S "$(< "${repo}/tests/env")" \
+      "${fenv}" -k MC_XDG_OPEN -Ed '^MC_.*' -- env
+     )

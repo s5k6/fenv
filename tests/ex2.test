@@ -1,0 +1,12 @@
+#!/bin/bash
+set -u -e -C;
+shopt -s nullglob failglob
+
+# run diff ignoring its exit code.
+function diff { command diff "$@" || true; }
+
+
+# Keep only the entries named `HOME` and `USER`:
+
+env -i -S "$(< "${repo}/tests/env")" \
+    "${fenv}" fenv -k HOME USER -- env

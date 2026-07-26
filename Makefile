@@ -12,6 +12,9 @@ clean :
 distclean : clean
 	rm -f fenv
 
+test : all
+	tests/run
+
 fenv : fenv.c help.str
 
 %.str : %.txt

@@ -1,0 +1,54 @@
+#!/bin/bash
+set -u -e -C;
+shopt -s nullglob failglob
+
+function err { echo $'\e[1;31m'"$*"$'\e[m' >&2; exit 1; }
+function warn { echo $'\e[1;35m'"$*"$'\e[m' >&2; }
+function info { echo $'\e[36m'"$*"$'\e[m'; }
+
+export repo="$(git rev-parse --show-toplevel)";
+export fenv="${repo}/fenv"
+
+cd "${repo}"
+
+
+declare -i count=0
+declare -i skip=0
+declare -i changed=0
+declare -i failed=0
+
+while IFS= read -r tc; do
+    count+=1
+
+    if ! test -x "${tc}"; then
+        skip+=1
+        warn "skip ${tc}"
+        continue
+    fi
+
+    if ! "${tc}" 1>| "${tc%.test}.out" 2>| "${tc%.test}.err"; then
+        failed+=1
+        warn "Failed: ${tc}"
+    fi
+
+done < <(find tests -type f -name '*.test')
+
+
+while IFS= read -r -d '' f; do
+    changed+=1
+    warn "modified ${f}"
+    git --no-pager diff "${f}"
+done < <(git ls-files -z -m tests/)
+
+
+while IFS= read -r -d '' f; do
+    info "new: ${f}"
+    cat "${f}"
+done < <(git ls-files -z -o tests/)
+
+
+info 'TEST RESULTS'
+echo "Skipped ${skip} tests."
+echo "Executed ${count} tests."
+echo "${changed} gave a different result."
+echo "${failed} gave a non-zero exit code."

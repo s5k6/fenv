@@ -1,0 +1,5 @@
+#!/bin/bash
+set -u -e -C;
+shopt -s nullglob failglob
+
+env -i a=1 b=2 "${fenv}" -d a -- env

@@ -98,46 +98,48 @@ prints its environment.
  1. Drop all entries whose name starts with `GTK_` or `MC_`.  Using
    two glob patterns:
 
-        $ fenv   -G -d 'GTK_*' 'MC_*'     -- env
+        $ fenv 'GTK_*' 'MC_*' -- env
 
-    Using one extended regular expression:
+    Using one extended regular expression (note anchoring):
 
-        $ fenv   -E -d '(GTK|MC)_.*'      -- env
+        $ fenv -E '^(GTK|MC)_.*' -- env
 
     Using one of each:
 
-        $ fenv   -d -G 'GTK_*' -E 'MC_.*'   -- env
+        $ fenv -E '^GTK_.*' -G 'MC_*' -- env
 
  2. Keep only the entries named `HOME` and `USER`:
 
-        $ fenv   -k HOME USER   -- env
+        $ fenv -k HOME USER -- env
 
  3. Drop all entries whose name starts with `MC_`, except for
     `MC_XDG_OPEN`.  In the first version, the keep-pattern is
-    interpreted as fixed string, in the second as glob:
+    interpreted as glob, in the second as fixed string:
 
-        $ fenv      -k MC_XDG_OPEN -d -G 'MC_*'   -- env
-        $ fenv   -G -k MC_XDG_OPEN -d    'MC_*'   -- env
+        $ fenv    -k MC_XDG_OPEN -d    'MC_*' -- env
+        $ fenv -F -k MC_XDG_OPEN -d -G 'MC_*' -- env
 
     Same as the first one above, but the drop pattern is an extended
     regular expression, and the option flags are arranged differently.
 
-        $ fenv      -k MC_XDG_OPEN -Ed 'MC_.*'   -- env
+        $ fenv -k MC_XDG_OPEN -Ed '^MC_.*' -- env
 
  4. Drop all variables with an empty *value*:
 
-        $ fenv   -dv ''   -- env
+        $ fenv -v '' -- env
 
-    Drop all entries whose value contains the user's name.  Uses
-    globbing for the pattern
+    Drop all entries whose value contains the user's name.  First
+    version uses globbing for the pattern, second a regular
+    expression.
 
-        $ fenv   -Gdv "*${USER}*"   -- env
+        $ fenv -v "*${USER}*" -- env
+        $ fenv -Ev "${USER}" -- env
 
  5. Drop the PATH variable if it contains the word `foo`.
 
-        $ fenv   -dwG "PATH=*foo*"   -- env
+        $ fenv -wG "PATH=*foo*" -- env
 
  6. This may look a tad contrived — keep only entries whose name
     contains an `X`, except for those whose value is a number:
 
-        $ fenv   -dvE '[0-9]*[02468]' -knG '*X*'   -- env
+        $ fenv -vE '^[[:digit:]]*$' -knG '*X*' -- env
