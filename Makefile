@@ -15,9 +15,9 @@ distclean : clean
 test : fenv
 	./testsuite
 
-fenv : fenv.c fenv.help
+fenv : fenv.c help.str
 
-%.help : %.txt
+%.str : %.txt
 	sed -E 's/"/\\"/g; s/^/"/; s/$$/\\n"/' $< > $@
 
 % : %.c
