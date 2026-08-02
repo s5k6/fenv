@@ -20,26 +20,25 @@ Description
 ===========
 
 Each entry in the set of current environment variables is matched
-against a list of [patterns](#P) given in OPTIONS.
+against a list of **patterns** given in OPTIONS.
 
-The OPTIONS are either [patterns](#P), or (with the exception of `-V`)
-[flags](#F) modifying the semantics of subsequent patterns.  The
-default (no flags given) is to drop entries whose name matches a
-cases-sensitive glob.  This is equivalent to `-dnIG`.
+The OPTIONS are either patterns, or **flags** modifying the semantics
+of subsequent patterns (with the exception of `-V`).  The default (no
+flags given) is to drop entries whose name matches a cases-sensitive
+glob.  This is equivalent to `-dnIG`.
 
 Example: Keep only entries whose name contains an `X`, except for
 those whose value is a whole decimal number:
 
     $ fenv -vE '^[[:digit:]]*$' -knG '*X*' -- env
 
-More useful [examples](#E) at the end, as this may look a little
-contrived.
+More useful examples at the end, as this may look a little contrived.
 
 
-Patterns                                                            {#P}
+Patterns
 --------
 
-The preceding [Flags](#F) determine whether a pattern is used as fixed
+The preceding flags determine whether a pattern is used as fixed
 string, glob (default), basic or extended regular expression, whether
 it is case sensitive (default), and whether it is applied to only the
 NAME (default), VALUE, or the entire NAME=VALUE entry.
@@ -50,7 +49,7 @@ NAME (default), VALUE, or the entire NAME=VALUE entry.
   to be a dash, then the leading dash must be doubled.
 
 
-Flags                                                               {#F}
+Flags
 -----
 
 The effect of a flag applies to all following patterns, until
@@ -155,7 +154,7 @@ ubiquitous end-of-options indicator `--`.
   and its arguments.
 
 
-Examples                                                            {#E}
+Examples
 ========
 
 The following examples run the command `env`, which prints its

@@ -1,6 +1,6 @@
 
-fenv --- run a program in a filtered environment
-================================================
+fenv — run a program in a filtered environment
+==============================================
 
 Similar to env(1), but more focused on filtering environment
 variables.  `fenv` = “filter env”.
