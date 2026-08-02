@@ -1,5 +1,5 @@
 
-fenv --- run a program in a modified environment
+fenv --- run a program in a filtered environment
 ================================================
 
 Similar to env(1), but more focused on filtering environment
@@ -13,4 +13,4 @@ are straight-forward.
 See [the manual][1] for instructions.
 
 
-[1]: ./help.txt
+[1]: ./help.md
