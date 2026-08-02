@@ -339,23 +339,23 @@ int main(int argc, char **argv) {
         warnx("No filters defined, this is pointless.");
     } else if (verbosity & VPATTERN) {
         for (int i = 0; i < filterTop; i++) {
-            char const *k, *w, *a;
-            k = filters[i].keep ? "keep" : "drop";
+            char k, w, a;
+            k = filters[i].keep ? 'k' : 'd';
             switch (filters[i].what) {
-                case NAME: w = "name"; break;
-                case VALUE: w = "value"; break;
-                case WHOLE: w = "whole"; break;
+                case NAME: w = 'n'; break;
+                case VALUE: w = 'v'; break;
+                case WHOLE: w = 'w'; break;
             }
             switch (filters[i].algo) {
-                case FIXED: a = "fixed"; break;
-                case GLOB: a = "glob"; break;
-                case BASIC: a = "basic"; break;
-                case EXTENDED: a = "extended"; break;
+                case FIXED: a = 'F'; break;
+                case GLOB: a = 'G'; break;
+                case BASIC: a = 'B'; break;
+                case EXTENDED: a = 'E'; break;
             }
             warnx(
-                "Pattern %d: %s %s %s %s: %s",
+                "Pattern %d -%c%c%c%c: %s",
                 i, k, w, a,
-                filters[i].fold ? "fold" : "case",
+                filters[i].fold ? 'i' : 'I',
                 filters[i].pattern
             );
         }

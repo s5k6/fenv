@@ -2,7 +2,7 @@
 Name
 ====
 
-    env - run a program in a filtered environment
+`fenv` — run a program in a filtered environment.
 
 
 Synopsis
@@ -13,7 +13,7 @@ Synopsis
 
 The first form prints this help.  The second form replaces itself with
 COMMAND... after filtering the environment variables.  Not giving a
-command may be useful for debugging.
+command may be useful for debugging with option `-V`.
 
 
 Description
@@ -23,23 +23,31 @@ Each entry in the set of current environment variables is matched
 against a list of [patterns](#P) given in OPTIONS.
 
 The OPTIONS are either [patterns](#P), or (with the exception of `-V`)
-[flags](#F) modifying how semantics of subsequent patterns.  The
+[flags](#F) modifying the semantics of subsequent patterns.  The
 default (no flags given) is to drop entries whose name matches a
-cases-sensitive glob, which is equivalent to `-dnIG`.
+cases-sensitive glob.  This is equivalent to `-dnIG`.
+
+Example: Keep only entries whose name contains an `X`, except for
+those whose value is a whole decimal number:
+
+    $ fenv -vE '^[[:digit:]]*$' -knG '*X*' -- env
+
+More useful [examples](#E) at the end, as this may look a little
+contrived.
 
 
 Patterns                                                            {#P}
 --------
 
+The preceding [Flags](#F) determine whether a pattern is used as fixed
+string, glob (default), basic or extended regular expression, whether
+it is case sensitive (default), and whether it is applied to only the
+NAME (default), VALUE, or the entire NAME=VALUE entry.
+
 `PATTERN`, `--PATTERN`
 : Command line arguments before `--` not starting with a dash are
   considered patterns.  If the first character of a pattern is desired
   to be a dash, then the leading dash must be doubled.
-
-The preceding [Flags](#F) determine whether a pattern is used as fixed
-string, glob (default), basic or extended regular expression, whether
-it is case sensitive (default), and whether it is applied to only the
-NAME (default), VALUE, or the entire NAME=VALUE string of en entry.
 
 
 Flags                                                               {#F}
@@ -147,14 +155,14 @@ ubiquitous end-of-options indicator `--`.
   and its arguments.
 
 
-Examples
+Examples                                                            {#E}
 ========
 
 The following examples run the command `env`, which prints its
 environment.
 
- 1. Drop all entries whose name starts with `GTK_` or `MC_`.  Using
-    two glob patterns:
+ 1. Blacklisting: Drop all entries whose name starts with `GTK_` or
+    `MC_`.  Using two glob patterns:
 
         $ fenv 'GTK_*' 'MC_*' -- env
 
@@ -162,16 +170,16 @@ environment.
 
         $ fenv -E '^(GTK|MC)_.*' -- env
 
- 2. Keep only the entries named `HOME` and `USER`:
+ 2. Whitelisting: Keep only the entries named `HOME` and `USER`:
 
         $ fenv -k HOME USER -- env
 
- 3. Drop all entries whose name starts with `MC_`, except for
-    `MC_XDG_OPEN`:
+ 3. Exceptions: Drop all entries whose name starts with `MC_`, except
+    for `MC_XDG_OPEN`:
 
         $ fenv -k MC_XDG_OPEN -d 'MC_*' -- env
 
- 4. Drop all variables with an empty *value*:
+ 4. Looking at values: Drop all variables with an empty value:
 
         $ fenv -v '' -- env
 
@@ -182,11 +190,12 @@ environment.
         $ fenv -v "*${USER}*" -- env
         $ fenv -Ev "${USER}" -- env
 
- 5. Drop the PATH variable if it contains the word `foo`.
+ 5. Match name *and* value: Drop the PATH variable if it contains the
+    word `foo`.
 
         $ fenv -wG "PATH=*foo*" -- env
 
- 6. This may look a tad contrived — keep only entries whose name
-    contains an `X`, except for those whose value is a number:
+ 6. Pattern with leading dash: Drop all environment variables whose
+    value starts with a dash:
 
-        $ fenv -vE '^[[:digit:]]*$' -knG '*X*' -- env
+        $ fenv -v '--*' -- env
