@@ -17,7 +17,7 @@ test : all
 
 fenv : fenv.c help.str
 
-%.str : %.txt
+%.str : %.md
 	sed -E 's/"/\\"/g; s/^/"/; s/$$/\\n"/' $< > $@
 
 % : %.c
