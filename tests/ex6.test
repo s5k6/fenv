@@ -9,9 +9,10 @@ function diff { command diff "$@" || true; }
 # Load environment from file (twice).  Compare printing the
 # environment without fenv, and with fenv.
 
-# keep only entries whose name contains an `X`, except for those whose
-# value is a number:
+# Drop all entries whose value contains the user's name.
 
-env -i -S "$(< "${repo}/tests/env")" \
-    "${fenv}" -vE '^[[:digit:]]*$' -knG '*X*' \
-    -- env
+diff \
+    <(env -i -S "$(< "${repo}/tests/env")" ) \
+    <(env -i -S "$(< "${repo}/tests/env")" \
+      "${fenv}" -v '--*' -- env
+     )

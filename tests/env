@@ -13,6 +13,7 @@ XDG_SEAT=seat0
 MC_FOO=blubb
 XDG_SESSION_TYPE=tty
 DRAWHOME=/usr/share/opencascade/resources/DrawResources
+PATH=/home/foo/.local/bin:/usr/local/bin:/usr/bin:/bin:/opt/cuda/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl
 SYSTEMD_EXEC_PID=1241
 HOSTDISPLAY=somehost:0
 FVWM_MODULEDIR=/usr/lib/fvwm3/1.1.5

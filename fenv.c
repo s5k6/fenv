@@ -190,6 +190,9 @@ int main(int argc, char **argv) {
 
         if (argv[i][0] == '-' && argv[i][1] != '-') {
 
+            if (! argv[i][1])
+                errx(1, "Invalid option: solitary dash.");
+
             /* Everything starting with `-` but not `--` is considered
             a string of options.  Iterate over the individual
             characters. */

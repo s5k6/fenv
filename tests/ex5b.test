@@ -1,0 +1,18 @@
+#!/bin/bash
+set -u -e -C;
+shopt -s nullglob failglob
+
+# run diff ignoring its exit code.
+function diff { command diff "$@" || true; }
+
+
+# Load environment from file (twice).  Compare printing the
+# environment without fenv, and with fenv.
+
+# Drop all entries whose value contains the user's name.
+
+diff \
+    <(env -i -S "$(< "${repo}/tests/env")" ) \
+    <(env -i -S "$(< "${repo}/tests/env")" \
+      "${fenv}" -w "PATH=*python*" -- env
+     )

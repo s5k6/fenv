@@ -1,6 +1,8 @@
-21d20
+16d15
+< PATH=/home/foo/.local/bin:/usr/local/bin:/usr/bin:/bin:/opt/cuda/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl
+22d20
 < PWD=/home/foo/prg/env
-30d28
+31d28
 < USER=foo
-42d39
+43d39
 < HOME=/home/foo

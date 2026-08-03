@@ -53,7 +53,7 @@ Flags
 -----
 
 The effect of a flag applies to all following patterns, until
-overridden by another flag of the same group.
+overridden by another flag affecting the same property.
 
 Flags may be grouped together, i.e., `-iBv` is equivalent to `-i -B
 -v`, matching case insensive basic regular expressions against values
@@ -64,8 +64,8 @@ from the environment.
 
 The first matching pattern determines the fate of the entry: Matching
 a drop-pattern removes the entry from the environment, matching a
-keep-pattern keeps the entry.  In either case, this entry is not
-tested against following patterns.
+keep-pattern keeps the entry.  In either case, the matching entry is
+not tested against any further pattern.
 
 `-d`
 : The following patterns are drop-patterns.
@@ -81,23 +81,24 @@ unmatched entries are dropped.
 ### Pattern syntax
 
 `-F`
-: The following patterns are fixed string.  The pattern must match the
-  entire strings.  For details, cf. strcmp(3), strcasecmp(3).
+: The following patterns are fixed strings.  A pattern must match the
+  entire string.  For details, cf. strcmp(3), strcasecmp(3).
 
 `-G`
-: The following patterns are globs.  This is the default.  The pattern
+: The following patterns are globs.  This is the default.  A pattern
   must match the entire string.  Use `*PATTERN*` to test for
   substrings.  For details, cf. glob(7), fnmatch(3).
 
 `-B`
-: The following pattern are basic regular expressions.  These match on
-  substrings.  Use *anchoring* to further constrain matches.  For
-  details, cf. regcomp(3).
+: The following patterns are basic regular expressions.  These match
+  on substrings.  Use *anchoring* to further constrain matches.  For
+  details, cf. regex(7), regcomp(3).
 
 `-E`
-: The following pattern are extended regular expressions.  These
-  matches on substrings.  Use anchoring to further constrain matches.
-  For details, cf. regcomp(3) flag `REG_EXTENDED`.
+: The following patterns are extended regular expressions.  These
+  matches on substrings.  Use *anchoring* to further constrain
+  matches.  For details, cf. regex(7), and flag `REG_EXTENDED` of
+  regcomp(3).
 
 
 ### Case sensitivity
@@ -192,7 +193,7 @@ environment.
  5. Match name *and* value: Drop the PATH variable if it contains the
     word `foo`.
 
-        $ fenv -wG "PATH=*foo*" -- env
+        $ fenv -w "PATH=*foo*" -- env
 
  6. Pattern with leading dash: Drop all environment variables whose
     value starts with a dash:
