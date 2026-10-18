@@ -40,15 +40,16 @@ struct filter {
 enum verb {
     VPATTERN = 1,    // print patterns
     VMATCH = 2,      // report matching entries and pattern
-    VUNMATCHED = 4,  // report unmatched entries
-    VVERDICT = 8     // report verdict, keep or drop
+    VMISS = 4,       // report mismatching entries and pattern
+    VUNMATCHED = 8,  // report finally unmatched entries
+    VVERDICT = 16    // report verdict, keep or drop
 };
 
 
 
 /* Most options specify how the subsequent patterns are to be used
 (glob/regex, case sensitivity). Warn, if such an option goes unused.
-E.g., in `fenv -i -I` the `-I` cancels the prior `-i`, making its
+E.g., in `fenv -c -C` the `-C` cancels the prior `-c`, making its
 presence pointless. */
 
 void chkUnusedOpt(char *unused, char c) {
@@ -221,8 +222,8 @@ int main(int argc, char **argv) {
                         chkUnusedOpt(&unusedAlgo, *c);
                         break;
 
-                    case 'i':
-                    case 'I':
+                    case 'c':
+                    case 'C':
                         chkUnusedOpt(&unusedFold, *c);
                         break;
                 }
@@ -242,23 +243,23 @@ int main(int argc, char **argv) {
                     case 'B': curAlgo = BASIC; break;
                     case 'E': curAlgo = EXTENDED; break;
 
-                    case 'i': curFold = true; break;
-                    case 'I': curFold = false; break;
+                    case 'c': curFold = true; break;
+                    case 'C': curFold = false; break;
 
-                    /* Set verbosity, either by value, or increase by
-                    one.  This is a bit ugly, as it does not match the
-                    other option parsing logic. */
+                    /* Set verbosity, either by value, or set lowest
+                    zero bit.  This is a bit ugly, as it does not
+                    match the other option parsing logic. */
                     case 'V':
                         {
                             char *q = c + 1;
                             long int v = strtol(q, &c, 10);
                             if (c == q)
-                                verbosity++;
+                                verbosity = verbosity | (verbosity + 1);
                             else
                                 verbosity = v;
                             c--;
 
-                            if (verbosity > 15)
+                            if (verbosity > 31)
                                 errx(1, "Verbosity too big.");
                         }
                         break;
@@ -358,7 +359,7 @@ int main(int argc, char **argv) {
             warnx(
                 "Pattern %d -%c%c%c%c: %s",
                 i, k, w, a,
-                filters[i].fold ? 'i' : 'I',
+                filters[i].fold ? 'c' : 'C',
                 filters[i].pattern
             );
         }
@@ -455,6 +456,10 @@ int main(int argc, char **argv) {
                 keep = f.keep;
                 goto matched;  // break out of two nested loops
             }
+
+            if (verbosity & VMISS)
+                warnx("Missmatch %d: %s", j, environ[i]);
+
         }
         if (verbosity & VUNMATCHED)
             warnx("Unmatched: %s", environ[i]);

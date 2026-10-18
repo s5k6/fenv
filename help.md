@@ -9,7 +9,7 @@ Synopsis
 ========
 
     fenv
-    fenv [OPTIONS...] [-- COMMAND...]
+    fenv OPTIONS... [-- COMMAND...]
 
 The first form prints this help.  The second form replaces itself with
 COMMAND... after filtering the environment variables.  Not giving a
@@ -19,45 +19,48 @@ command may be useful for debugging with option `-V`.
 Description
 ===========
 
-Each entry in the set of current environment variables is matched
-against a list of **patterns** given in OPTIONS.
+The standalone `--` separates the OPTIONS from the COMMAND to run.
 
-The OPTIONS are either patterns, or **flags** modifying the semantics
-of subsequent patterns (with the exception of `-V`).  The default (no
-flags given) is to drop entries whose name matches a cases-sensitive
-glob.  This is equivalent to `-dnIG`.
+With the exception of `-V` (which controls verbosity for debugging),
+every option is either a **pattern**, or a combination of **flags**.
 
-Example: Keep only entries whose name contains an `X`, except for
-those whose value is a whole decimal number:
+A flag affects the semantics of subsequent patterns.
 
-    $ fenv -vE '^[[:digit:]]*$' -knG '*X*' -- env
+Each entry in the current environment is matched against the patterns,
+left to right.  The first matching pattern determines the fate of the
+environment entry.
 
-More useful examples at the end, as this may look a little contrived.
+By default (no flags given) patterns are interpreted as case-sensitive
+globs against variable names, and matching entries are dropped.
+
+Example:
+
+    $ fenv 'HTTP*' 'FTP*' -- env
+
+This would run `env` after removing all environment variables whose
+name starts with `HTTP` or `FTP`.
 
 
 Patterns
 --------
 
-The preceding flags determine whether a pattern is used as fixed
-string, glob (default), basic or extended regular expression, whether
-it is case sensitive (default), and whether it is applied to only the
-NAME (default), VALUE, or the entire NAME=VALUE entry.
-
 `PATTERN`, `--PATTERN`
-: Command line arguments before `--` not starting with a dash are
-  considered patterns.  If the first character of a pattern is desired
-  to be a dash, then the leading dash must be doubled.
+: Patterns are distinguished from flags by the absence of a leading
+  dash.  If the first character of a pattern is desired to be a dash,
+  then the leading dash must be doubled.
+
+The preceding flags determine syntax and effect of a pattern, see
+below for details.
 
 
 Flags
 -----
 
 The effect of a flag applies to all following patterns, until
-overridden by another flag affecting the same property.
+overridden by another flag affecting the same trait.
 
-Flags may be grouped together, i.e., `-iBv` is equivalent to `-i -B
--v`, matching case insensive basic regular expressions against values
-from the environment.
+Flags may be grouped together, e.g., `-cBv` is equivalent to `-c -B
+-v`, `-cB -v` and `-c -Bv`.
 
 
 ### Effect of a match
@@ -74,8 +77,13 @@ not tested against any further pattern.
 : The following patterns are keep-patterns.
 
 If the last pattern is a drop-pattern, then unmatched entries are kept
-in the environment.  Conversely, if the last pattern is keep-pattern,
-unmatched entries are dropped.
+in the environment.  Conversely, unmatched entries are dropped if the
+last pattern is a keep-pattern.
+
+Example:
+
+    $ fenv -d 'X*' -- env      # drop entries whose name starts with X
+    $ fenv -k 'X*' -- env      # keep entries whose name starts with X
 
 
 ### Pattern syntax
@@ -103,10 +111,10 @@ unmatched entries are dropped.
 
 ### Case sensitivity
 
-`-I`
+`-C`
 : The following patterns are case-sensitive.  This is the default.
 
-`-i`
+`-c`
 : Ignore case in the following patterns.  For details,
   cf. strcasecmp(3) for fixed strings, the `FNM_CASEFOLD` flag of
   fnmatch(3) for globs, or the `REG_ICASE` flag of regcomp(3) for
@@ -133,14 +141,16 @@ unmatched entries are dropped.
 This is the only global option.  It does not affect patterns.
 
 `-V`, `-V`N
-: If decimal integer N is given, then verbosity is set to N, otherwise
-  it is increased by one.  In any case, verbosity is interpreted as a
-  bitmask, with the following values:
+: Verbosity is interpreted as a bitmask, with the following values:
 
       1   enumerate the filters constructed from the command line
       2   report filter and environment entry on match
-      4   report unmatched environment entries
-      8   report verdict for each environment entry
+      4   report filter and environment entry on mismatch
+      8   report unmatched environment entries
+      16  report final verdict for each environment entry
+
+  If decimal integer N is given, then verbosity is set to N.
+  Otherwise the lowest zero bit is set.
 
 
 Command
@@ -151,8 +161,8 @@ environment must be given last on the command line, following the
 ubiquitous end-of-options indicator `--`.
 
 `--`
-: End of options.  The following arguments specify the command to run,
-  and its arguments.
+: The following arguments specify the command to run, and its
+  arguments.
 
 
 Examples

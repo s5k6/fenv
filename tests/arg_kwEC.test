@@ -3,5 +3,5 @@ set -u -e -C;
 shopt -s nullglob failglob
 
 env -i a=1 b=x c=a=2 A=3 d=A=4 \
-    "${fenv}" -kwEi 'a=[[:digit:]]*' \
+    "${fenv}" -kwEC 'a=[[:digit:]]*' \
     -- env
