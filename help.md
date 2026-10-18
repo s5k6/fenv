@@ -12,33 +12,25 @@ Synopsis
     fenv OPTIONS... [-- COMMAND...]
 
 The first form prints this help.  The second form replaces itself with
-COMMAND... after filtering the environment variables.  Not giving a
-command may be useful for debugging with option `-V`.
+COMMAND... after filtering the environment.
 
 
 Description
 ===========
 
-The standalone `--` separates the OPTIONS from the COMMAND to run.
+The standalone `--` separates the OPTIONS from the COMMAND to be run
+in the modified environment.  Not giving a command may be useful for
+debugging with option `-V`.
 
-With the exception of `-V` (which controls verbosity for debugging),
-every option is either a **pattern**, or a combination of **flags**.
-
+Every OPTION is either a **pattern**, or a combination of **flags**.
 A flag affects the semantics of subsequent patterns.
 
 Each entry in the current environment is matched against the patterns,
-left to right.  The first matching pattern determines the fate of the
-environment entry.
+left to right.  The first matching pattern determines whether the
+entry is kept (`-k`) or dropped (`-d`).
 
 By default (no flags given) patterns are interpreted as case-sensitive
 globs against variable names, and matching entries are dropped.
-
-Example:
-
-    $ fenv 'HTTP*' 'FTP*' -- env
-
-This would run `env` after removing all environment variables whose
-name starts with `HTTP` or `FTP`.
 
 
 Patterns
@@ -59,8 +51,8 @@ Flags
 The effect of a flag applies to all following patterns, until
 overridden by another flag affecting the same trait.
 
-Flags may be grouped together, e.g., `-cBv` is equivalent to `-c -B
--v`, `-cB -v` and `-c -Bv`.
+Flags may be grouped together, e.g., the following combinations are
+all equivalent: `-cBv`, `-c -B -v`, `-cB -v` and `-c -Bv`.
 
 
 ### Effect of a match
@@ -138,31 +130,29 @@ Example:
 
 ### Debugging
 
-This is the only global option.  It does not affect patterns.
+Verbosity is controled by a bitmask.  Some bits are per filter, i.e,
+setting them affects only the patterns specified later on the command
+line.  The other bits are per environment entry, the last setting used
+on the command line is used.
 
 `-V`, `-V`N
-: Verbosity is interpreted as a bitmask, with the following values:
+: Set the bitmask to N if present, or *all* if absent.
 
-      1   enumerate the filters constructed from the command line
-      2   report filter and environment entry on match
-      4   report filter and environment entry on mismatch
-      8   report unmatched environment entries
-      16  report final verdict for each environment entry
+The following bits apply to all subsequent patterns:
 
-  If decimal integer N is given, then verbosity is set to N.
-  Otherwise the lowest zero bit is set.
+    1   show filter and its ID before processing starts
+    2   report filter ID and envrironment entry on match
+    4   report filter ID and envrironment entry on mismatch
 
+The last setting of the following bits applies to environment entries:
 
-Command
--------
+    8   report unmatched entries
+    16  report kept entries
+    32  report dropped entries
 
-The command (and its arguments) to be executed in the modified
-environment must be given last on the command line, following the
-ubiquitous end-of-options indicator `--`.
-
-`--`
-: The following arguments specify the command to run, and its
-  arguments.
+If you want all information, use `-V` as *first* argument.  Surround a
+pattern with `-V` and `-V0` to get all information about this pattern
+only.
 
 
 Examples
@@ -171,14 +161,14 @@ Examples
 The following examples run the command `env`, which prints its
 environment.
 
- 1. Blacklisting: Drop all entries whose name starts with `GTK_` or
-    `MC_`.  Using two glob patterns:
+ 1. Blacklisting: Drop all entries whose name starts with `HTTP` or
+    `FTP`.  Using two glob patterns:
 
-        $ fenv 'GTK_*' 'MC_*' -- env
+        $ fenv 'HTTP*' 'FTP*' -- env
+        $ fenv -E '^(HTTP|FTP).*' -- env
 
-    Using one extended regular expression (note anchoring):
-
-        $ fenv -E '^(GTK|MC)_.*' -- env
+    The second version uses an extended regular expression, which
+    requires anchoring.
 
  2. Whitelisting: Keep only the entries named `HOME` and `USER`:
 
@@ -193,9 +183,7 @@ environment.
 
         $ fenv -v '' -- env
 
-    Drop all entries whose value contains the user's name.  First
-    version uses globbing for the pattern, second a regular
-    expression.
+    Drop all entries whose value contains the user's name:
 
         $ fenv -v "*${USER}*" -- env
         $ fenv -Ev "${USER}" -- env

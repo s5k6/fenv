@@ -10,6 +10,23 @@
 #include <stdbool.h>
 
 
+/* Verbosity is controlled by the following bits.  The per-pattern
+ones individually control verbosity for each pattern.  Those per-entry
+control verbosity for each environment entry. */
+
+enum verb {
+    // per pattern
+    VPATTERN = 1,    // print patterns
+    VMATCH = 2,      // report match
+    VMISS = 4,       // report mismatch
+    // per entry
+    VUNMATCHED = 8,  // report finally unmatched entries
+    VKEEP = 16,      // report when verdict is keep
+    VDROP = 32       // report when verdict is drop
+};
+
+const unsigned int verbAll = 63;  // all bits
+
 
 /* Patterns can be matched against the NAME, the VALUE, or the entire
 NAME=VALUE string representing an enviroment entry.*/
@@ -29,20 +46,10 @@ struct filter {
     bool keep;       // Keep matching entries if true, drop them otherwise.
     enum what what;  // cf. `enum what`
     enum algo algo;  // cf. `enum algo`
+    unsigned long int verb;  // verbosity for this pattern
     bool fold;
     char *pattern;
     regex_t *regex;
-};
-
-
-/* Verbositu is controlled by the following bits. */
-
-enum verb {
-    VPATTERN = 1,    // print patterns
-    VMATCH = 2,      // report matching entries and pattern
-    VMISS = 4,       // report mismatching entries and pattern
-    VUNMATCHED = 8,  // report finally unmatched entries
-    VVERDICT = 16    // report verdict, keep or drop
 };
 
 
@@ -55,8 +62,13 @@ presence pointless. */
 void chkUnusedOpt(char *unused, char c) {
     if (*unused) {
         if (c)
-            errx(1, "Option -%c undoes option -%c, which is not used by "
-                    "any pattern.", c, *unused);
+            errx(
+                1,
+                "Option -%c %s option -%c, which is not used by any pattern.",
+                c,
+                c == *unused ? "repeats" : "undoes",
+                *unused
+            );
         else
             errx(1, "Option -%c is not used by any pattern.", *unused);
     }
@@ -169,7 +181,6 @@ int main(int argc, char **argv) {
     int filterTop = 0;  // utilisation of filters
 #define FILTER (filters[filterTop])
 
-    long int verbosity = 0;  // verbosity setting
     char **cmd = NULL;  // command to run
 
     /* Current setting of filter modifiers. */
@@ -177,6 +188,7 @@ int main(int argc, char **argv) {
     bool curFold = false;
     enum what curWhat = NAME;
     enum algo curAlgo = GLOB;
+    unsigned int curVerb = 0;  // verbosity setting
 
 
     /* For each of the four categories of filter modifying options,
@@ -246,21 +258,19 @@ int main(int argc, char **argv) {
                     case 'c': curFold = true; break;
                     case 'C': curFold = false; break;
 
-                    /* Set verbosity, either by value, or set lowest
-                    zero bit.  This is a bit ugly, as it does not
-                    match the other option parsing logic. */
+                    /* Set verbosity bits.  Absence of value sets all,
+                    0 deletes all. */
                     case 'V':
                         {
                             char *q = c + 1;
                             long int v = strtol(q, &c, 10);
                             if (c == q)
-                                verbosity = verbosity | (verbosity + 1);
+                                curVerb = verbAll;
+                            else if (v < 0 || verbAll < v)
+                                errx(1, "Verbosity out of range.");
                             else
-                                verbosity = v;
+                                curVerb = (unsigned int)v;
                             c--;
-
-                            if (verbosity > 31)
-                                errx(1, "Verbosity too big.");
                         }
                         break;
 
@@ -301,6 +311,7 @@ int main(int argc, char **argv) {
             FILTER.what = curWhat;
             FILTER.algo = curAlgo;
             FILTER.fold = curFold;
+            FILTER.verb = curVerb;
             FILTER.pattern = p;
 
             /* For basic and extended regular expressions, compile the
@@ -332,8 +343,8 @@ int main(int argc, char **argv) {
     if (!cmd)
         warnx("No command given.");
 
-    if (verbosity > 0)
-        warnx("Verbosity is %ld.", verbosity);
+    if (curVerb > 0)
+        warnx("Verbosity is %u.", curVerb);
 
 
     // Print accumulated filters
@@ -341,27 +352,31 @@ int main(int argc, char **argv) {
 
     if (filterTop < 1) {
         warnx("No filters defined, this is pointless.");
-    } else if (verbosity & VPATTERN) {
+    } else {
         for (int i = 0; i < filterTop; i++) {
-            char k, w, a;
-            k = filters[i].keep ? 'k' : 'd';
-            switch (filters[i].what) {
-                case NAME: w = 'n'; break;
-                case VALUE: w = 'v'; break;
-                case WHOLE: w = 'w'; break;
+            if (filters[i].verb & VPATTERN) {
+                char const *a, *w;
+                switch (filters[i].what) {
+                    case NAME: w = "name"; break;
+                    case VALUE: w = "value"; break;
+                    case WHOLE: w = "name=value"; break;
+                }
+                switch (filters[i].algo) {
+                    case FIXED: a = "string"; break;
+                    case GLOB: a = "glob"; break;
+                    case BASIC: a = "basic-regex"; break;
+                    case EXTENDED: a = "extended-regex"; break;
+                }
+                warnx(
+                    "Pattern %d: %s if %s matches case-%ssensitive %s: %s",
+                    i,
+                    filters[i].keep ? "keep" : "drop",
+                    w,
+                    filters[i].fold ? "in" : "",
+                    a,
+                    filters[i].pattern
+                );
             }
-            switch (filters[i].algo) {
-                case FIXED: a = 'F'; break;
-                case GLOB: a = 'G'; break;
-                case BASIC: a = 'B'; break;
-                case EXTENDED: a = 'E'; break;
-            }
-            warnx(
-                "Pattern %d -%c%c%c%c: %s",
-                i, k, w, a,
-                filters[i].fold ? 'c' : 'C',
-                filters[i].pattern
-            );
         }
     }
 
@@ -451,25 +466,29 @@ int main(int argc, char **argv) {
             }
 
             if (matched) {
-                if (verbosity & VMATCH)
-                    warnx("Match %d: %s", j, environ[i]);
+                if (f.verb & VMATCH)
+                    warnx("Matches %d: %s", j, environ[i]);
                 keep = f.keep;
                 goto matched;  // break out of two nested loops
             }
 
-            if (verbosity & VMISS)
+            if (f.verb & VMISS)
                 warnx("Missmatch %d: %s", j, environ[i]);
 
         }
-        if (verbosity & VUNMATCHED)
+        if (curVerb & VUNMATCHED)
             warnx("Unmatched: %s", environ[i]);
         matched:
 
-        if (keep)
+        if (keep) {
             newenv[newenvTop++] = environ[i];
+            if (curVerb & VKEEP)
+                warnx("Keep: %s", environ[i]);
+        } else {
+            if (curVerb & VDROP)
+                warnx("Drop: %s", environ[i]);
+        }
 
-        if (verbosity & VVERDICT)
-            warnx("%s: %s", keep ? "Keep" : "Drop", environ[i]);
     }
 
 
