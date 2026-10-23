@@ -1,5 +1,0 @@
-#!/bin/bash
-set -u -e -C;
-shopt -s nullglob failglob
-
-diff <("${fenv}") <(echo; cat "${repo}/help.md"; echo)

@@ -160,11 +160,22 @@ int main(int argc, char **argv) {
     /* Print help if called without arguments. */
 
     if (argc < 2) {
-        printf(
-            "\n"
-#include "help.str"
-            "\n"
-        );
+#include "short.inc"
+        return 0;
+    }
+
+    if (strcmp(argv[1], "-h") == 0) {
+        if (argc < 3) {
+#include "topics.inc"
+        } else if (strcmp(argv[2], "manual") == 0) {
+#include "long.inc"
+        } else if (strcmp(argv[2], "license") == 0) {
+#include "license.inc"
+        } else if (strcmp(argv[2], "version") == 0) {
+#include "version.inc"
+        } else {
+            errx(1, "Invalid topic: %s", argv[2]);
+        }
         return 0;
     }
 
@@ -242,6 +253,10 @@ int main(int argc, char **argv) {
 
                 /* Handles all options and detects invalid ones. */
                 switch (*c) {
+
+                    case 'h':
+                        errx(1, "Invalid use of option: -h");
+                        break;
 
                     case 'k': curKeep = true; break;
                     case 'd': curKeep = false; break;

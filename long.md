@@ -1,3 +1,7 @@
+---
+title: FENV(1)
+---
+
 
 Name
 ====
@@ -8,19 +12,35 @@ Name
 Synopsis
 ========
 
-    fenv
+    fenv [-h [TOPIC]]
     fenv OPTIONS... [-- COMMAND...]
 
-The first form prints this help.  The second form replaces itself with
-COMMAND... after filtering the environment.
+The first form replaces itself with COMMAND after filtering the
+environment according to the patterns defined in OPTIONS.
+
+The second form prints brief usage hints (without arguments), a list
+of topics (if only `-h` is present), or more detailed on a specified
+topic.
 
 
 Description
 ===========
 
-The standalone `--` separates the OPTIONS from the COMMAND to be run
-in the modified environment.  Not giving a command may be useful for
-debugging with option `-V`.
+Each Linux process has an “environment” (cf. environ(7) for details)
+which is inherited from parent to child processes.  Typically, env(1)
+is used to add or change environment entries before running a command,
+or to completely clear the environment.
+
+A more fine-grained means to sanitise the environment is `fenv`,
+allowing to sort out environment entries by pattern matching.
+
+
+Invocation
+----------
+
+The standalone `--` separates the OPTIONS from the COMMAND and its
+arguments to be run in the modified environment.  Not giving a command
+may be useful for debugging with option `-V`.
 
 Every OPTION is either a **pattern**, or a combination of **flags**.
 A flag affects the semantics of subsequent patterns.
@@ -162,13 +182,12 @@ The following examples run the command `env`, which prints its
 environment.
 
  1. Blacklisting: Drop all entries whose name starts with `HTTP` or
-    `FTP`.  Using two glob patterns:
+    `FTP`.  Note, that globs need to match the entire name,
 
-        $ fenv 'HTTP*' 'FTP*' -- env
-        $ fenv -E '^(HTTP|FTP).*' -- env
+        $ fenv    'HTTP*' 'FTP*' -- env    # -G is the default
+        $ fenv -E '^(HTTP|FTP)'  -- env
 
-    The second version uses an extended regular expression, which
-    requires anchoring.
+    while regular expressions match on substrings without anchoring.
 
  2. Whitelisting: Keep only the entries named `HOME` and `USER`:
 
@@ -182,11 +201,6 @@ environment.
  4. Looking at values: Drop all variables with an empty value:
 
         $ fenv -v '' -- env
-
-    Drop all entries whose value contains the user's name:
-
-        $ fenv -v "*${USER}*" -- env
-        $ fenv -Ev "${USER}" -- env
 
  5. Match name *and* value: Drop the PATH variable if it contains the
     word `foo`.

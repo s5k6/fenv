@@ -1,0 +1,4 @@
+    fenv -h             # this listing
+    fenv -h manual      # detailed manual
+    fenv -h license     # license information
+    fenv -h version     # version information

@@ -1,0 +1,17 @@
+#!/bin/bash
+set -u -e -C
+shopt -s nullglob failglob
+
+emptyline=true
+if test "${1}" = -n; then
+    emptyline=false
+    shift
+fi
+
+
+
+printf '%s\n' 'printf('
+if "${emptyline}"; then printf '%s\n' '"\n"'; fi
+sed -E 's/"/\\"/g; s/^/"/; s/$$/\\n"/' "$1"
+if "${emptyline}"; then printf '%s\n' '"\n"'; fi
+printf '%s\n' ');'

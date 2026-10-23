@@ -13,4 +13,4 @@ are straight-forward.
 See [the manual][1] for instructions.
 
 
-[1]: ./help.md
+[1]: ./long.md

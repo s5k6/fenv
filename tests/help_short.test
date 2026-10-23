@@ -1,0 +1,6 @@
+#!/bin/bash
+set -u -e -C;
+shopt -s nullglob failglob
+
+# reproduces short help
+diff <("${fenv}") <(echo; cat "${repo}/short.txt"; echo)
