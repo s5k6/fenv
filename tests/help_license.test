@@ -1,0 +1,6 @@
+#!/bin/bash
+set -u -e -C;
+shopt -s nullglob failglob
+
+# reproduces license
+diff <("${fenv}" -h license) <(echo; cat "${repo}/LICENSE"; echo)

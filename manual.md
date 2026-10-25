@@ -1,4 +1,3 @@
-
 Name
 ====
 
@@ -8,26 +7,43 @@ Name
 Synopsis
 ========
 
-    fenv
     fenv OPTIONS... [-- COMMAND...]
 
-The first form prints this help.  The second form replaces itself with
-COMMAND... after filtering the environment.
+The first form replaces itself with COMMAND after filtering the
+environment according to the patterns defined in OPTIONS.
+
+    fenv [-h [TOPIC]]
+
+The second form prints brief usage hints (without arguments), a list
+of topics (if only `-h` is present), or more detailed information on a
+specified topic.
 
 
 Description
 ===========
 
-The standalone `--` separates the OPTIONS from the COMMAND to be run
-in the modified environment.  Not giving a command may be useful for
-debugging with option `-V`.
+Each Linux process has an “environment” (cf. environ(7) for details)
+which is inherited from parent to child processes.  Typically, env(1)
+is used to add or change environment entries before running a command,
+or to completely clear the environment.
+
+This `fenv` provides a more fine-grained means to sanitise the
+environment by pattern matching on variable names, values, or both.
+
+
+Invocation
+----------
+
+The standalone `--` separates the OPTIONS from the COMMAND and its
+arguments to be run in the modified environment.  Not giving a command
+may be useful for debugging with option `-V`.
 
 Every OPTION is either a **pattern**, or a combination of **flags**.
 A flag affects the semantics of subsequent patterns.
 
 Each entry in the current environment is matched against the patterns,
-left to right.  The first matching pattern determines whether the
-entry is kept (`-k`) or dropped (`-d`).
+in the order given on the command line.  The first matching pattern
+determines whether the entry is kept (`-k`) or dropped (`-d`).
 
 By default (no flags given) patterns are interpreted as case-sensitive
 globs against variable names, and matching entries are dropped.
@@ -69,13 +85,8 @@ not tested against any further pattern.
 : The following patterns are keep-patterns.
 
 If the last pattern is a drop-pattern, then unmatched entries are kept
-in the environment.  Conversely, unmatched entries are dropped if the
-last pattern is a keep-pattern.
-
-Example:
-
-    $ fenv -d 'X*' -- env      # drop entries whose name starts with X
-    $ fenv -k 'X*' -- env      # keep entries whose name starts with X
+in the environment.  Conversely, if the last pattern is a
+keep-pattern, then unmatched entries are dropped.
 
 
 ### Pattern syntax
@@ -162,13 +173,12 @@ The following examples run the command `env`, which prints its
 environment.
 
  1. Blacklisting: Drop all entries whose name starts with `HTTP` or
-    `FTP`.  Using two glob patterns:
+    `FTP`.  Note, that globs need to match the entire name,
 
-        $ fenv 'HTTP*' 'FTP*' -- env
-        $ fenv -E '^(HTTP|FTP).*' -- env
+        $ fenv    'HTTP*' 'FTP*' -- env    # -G (glob) is the default
+        $ fenv -E '^(HTTP|FTP)'  -- env
 
-    The second version uses an extended regular expression, which
-    requires anchoring.
+    while regular expressions match on substrings without anchoring.
 
  2. Whitelisting: Keep only the entries named `HOME` and `USER`:
 
@@ -179,21 +189,16 @@ environment.
 
         $ fenv -k MC_XDG_OPEN -d 'MC_*' -- env
 
- 4. Looking at values: Drop all variables with an empty value:
-
-        $ fenv -v '' -- env
-
-    Drop all entries whose value contains the user's name:
-
-        $ fenv -v "*${USER}*" -- env
-        $ fenv -Ev "${USER}" -- env
-
- 5. Match name *and* value: Drop the PATH variable if it contains the
-    word `foo`.
-
-        $ fenv -w "PATH=*foo*" -- env
-
- 6. Pattern with leading dash: Drop all environment variables whose
+ 4. Pattern with leading dash: Drop all environment variables whose
     value starts with a dash:
 
         $ fenv -v '--*' -- env
+
+ 5. Looking at values: Drop all variables with an empty value:
+
+        $ fenv -v '' -- env
+
+ 6. Match name *and* value: Drop the PATH variable if it contains the
+    word `foo`.
+
+        $ fenv -w "PATH=*foo*" -- env

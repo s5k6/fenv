@@ -1,0 +1,9 @@
+Getting help on the environment filter:
+
+    fenv                # compact instructions
+    fenv -h             # this listing
+    fenv -h manual      # detailed manual
+    fenv -h license     # copyright notice
+    fenv -h version     # version information
+
+Also have a look at the manual page fenv(1).

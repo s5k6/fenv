@@ -1,0 +1,6 @@
+#!/bin/bash
+set -u -e -C;
+shopt -s nullglob failglob
+
+# reproduces topic listing
+diff <("${fenv}" -h) <(echo; cat "${repo}/topics.txt"; echo)

@@ -1,0 +1,18 @@
+Run a command in a filtered environment:
+
+    fenv OPTIONS... -- COMMAND...   # run COMMAND...
+    fenv -h [TOPIC]                 # show help (on topic)
+
+OPTIONS are patterns or flags.  Flags control the semantics of the
+subsequent patterns.  The first pattern matching an environment entry
+determines its fate.  Flags (defaults listed first) are:
+
+Matching entries are          Of a NAME=VALUE entry, matching concerns
+  `-d`  dropped,                `-n`  only the NAME part,
+  `-k`  kept.                   `-v`  only the VALUE part,
+                                `-w`  the whole NAME=VALUE string.
+Patterns are interpreted as
+  `-G`  globs,
+  `-F`  fixed strings,                      Matching is
+  `-B`  basic regular expressions,            `-C`  case-sensitive,
+  `-E`  extended regular expressions.         `-c`  case-insensitive.
